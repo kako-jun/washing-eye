@@ -3,7 +3,7 @@
  * - シャワーボタンの長押し（主ボタンのポインターごと）と Space キーを、入力元ごとに押下状態として持つ
  * - いずれかの入力元が押されていれば ON。全部離れたら OFF
  * - ウィンドウのフォーカスが外れた・タブが隠れたら、全入力元を解除して OFF
- * - 開始前（スタート画面表示中）は受け付けない
+ * - 開始前（スタート画面表示中）と、使えない間（手持ちシャワーを持っている間）は受け付けない
  * - Space は、シャワーボタン以外のボタンや入力欄にフォーカスがあるときは奪わない
  *
  * DOM は引数で受け取り、状態遷移はこのモジュールの中で完結させる。
@@ -20,6 +20,8 @@ export interface ShowerInputOptions {
   button: HTMLElement;
   /** 開始済みか（開始前は入力を受け付けない） */
   isStarted: () => boolean;
+  /** 今使えるか（手持ちシャワーを持っている間は false）。省略時は常に使える */
+  isEnabled?: () => boolean;
   /** ON/OFF が切り替わったときだけ呼ばれる */
   onChange: (on: boolean) => void;
 }
@@ -38,6 +40,8 @@ const pointerSource = (id: number) => `pointer:${id}`;
 
 export function createShowerInput(opts: ShowerInputOptions): ShowerInput {
   const { target, doc, button, isStarted, onChange } = opts;
+  const isEnabled = opts.isEnabled ?? (() => true);
+  const accepts = () => isStarted() && isEnabled();
   const pressed = new Set<string>();
   let on = false;
 
@@ -71,7 +75,7 @@ export function createShowerInput(opts: ShowerInputOptions): ShowerInput {
   const onKeyDown = (e: Event) => {
     const ke = e as KeyboardEvent;
     if (ke.code !== 'Space' || ke.repeat) return;
-    if (!isStarted() || isFocusedControl(ke.target)) return;
+    if (!accepts() || isFocusedControl(ke.target)) return;
     ke.preventDefault();
     press(KEY_SOURCE);
   };
@@ -87,7 +91,7 @@ export function createShowerInput(opts: ShowerInputOptions): ShowerInput {
     const pe = e as PointerEvent;
     pe.preventDefault();
     // シャワーは主ボタン（左クリック・タッチ・ペン）だけで出す
-    if (pe.button !== 0 || !isStarted()) return;
+    if (pe.button !== 0 || !accepts()) return;
     try {
       button.setPointerCapture(pe.pointerId);
     } catch {

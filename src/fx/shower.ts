@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 /**
  * シャワーの水。シャワーヘッドから狙った点へ向かう細い水筋（線分）と、当たった所のしぶき。
+ * ヘッドの位置と狙い点は外から与える（固定シャワーはヘッド固定・視線の先、手持ちシャワーはどちらも手の動きに追従）。
  */
 export class Shower {
   readonly group = new THREE.Group();
@@ -21,6 +22,7 @@ export class Shower {
   private readonly splashLife: Float32Array;
   private readonly splashMat: THREE.PointsMaterial;
   private on = false;
+  private respawnPending = false;
   /** 0〜1。出始め・止め際をなめらかにする */
   private flow = 0;
   private readonly tmp = new THREE.Vector3();
@@ -65,6 +67,10 @@ export class Shower {
   }
 
   setOn(on: boolean): void {
+    // 止まっていた状態から出すときは、前の位置へ向かっていた古い水滴を今のヘッド・狙い点から出し直す
+    if (on && !this.on && this.flow < 0.05) this.respawnPending = true;
+    // 出し直す前に止めたら、出し直しの予約も取り消す（止まったまま次に出すときに改めて予約する）
+    if (!on) this.respawnPending = false;
     this.on = on;
   }
 
@@ -77,6 +83,11 @@ export class Shower {
     this.target.copy(point);
   }
 
+  /** シャワーヘッドの位置（手持ちシャワーで、手の動きに合わせて動かす） */
+  setHead(point: THREE.Vector3): void {
+    this.head.copy(point);
+  }
+
   update(dt: number, hitNormal: THREE.Vector3 | null): void {
     const k = 1 - Math.exp(-dt * (this.on ? 6 : 4));
     this.flow += ((this.on ? 1 : 0) - this.flow) * k;
@@ -84,6 +95,10 @@ export class Shower {
     this.splashMat.opacity = 0.8 * this.flow;
     this.group.visible = this.flow > 0.01;
     if (!this.group.visible) return;
+    if (this.respawnPending) {
+      this.respawnPending = false;
+      for (let i = 0; i < this.n; i++) this.spawn(i, Math.random());
+    }
 
     const g = -4.5;
     for (let i = 0; i < this.n; i++) {

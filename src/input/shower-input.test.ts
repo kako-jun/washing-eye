@@ -4,6 +4,7 @@ import { createShowerInput, type ShowerInput } from './shower-input';
 
 let button: HTMLButtonElement;
 let started: boolean;
+let enabled: boolean;
 let onChange: Mock<(on: boolean) => void>;
 let input: ShowerInput;
 let visibility: DocumentVisibilityState;
@@ -39,6 +40,7 @@ beforeEach(() => {
   // jsdom は setPointerCapture を持たないことがあるので差し替える
   button.setPointerCapture = vi.fn();
   started = true;
+  enabled = true;
   visibility = 'visible';
   Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibility });
   onChange = vi.fn();
@@ -47,6 +49,7 @@ beforeEach(() => {
     doc: document,
     button,
     isStarted: () => started,
+    isEnabled: () => enabled,
     onChange,
   });
 });
@@ -197,5 +200,35 @@ describe('シャワー入力', () => {
     expect(input.on).toBe(false);
     input.releaseAll();
     expect(changes()).toEqual([true, false]);
+  });
+
+  it('使えない間（手持ちシャワーを持っている間）はボタンも Space も受け付けず、Space の既定動作も奪わない', () => {
+    enabled = false;
+    press('pointerdown');
+    expect(space('keydown')).toBe(false);
+    expect(input.on).toBe(false);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(button.setPointerCapture).not.toHaveBeenCalled();
+  });
+
+  it('使えるようになれば（スポンジに持ち替えれば）、また受け付ける', () => {
+    enabled = false;
+    press('pointerdown');
+    enabled = true;
+    press('pointerdown', 2);
+    expect(input.on).toBe(true);
+  });
+
+  it('isEnabled を省略すると常に使える', () => {
+    input.dispose();
+    input = createShowerInput({
+      target: window,
+      doc: document,
+      button,
+      isStarted: () => true,
+      onChange,
+    });
+    press('pointerdown');
+    expect(input.on).toBe(true);
   });
 });
