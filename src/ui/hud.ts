@@ -130,6 +130,8 @@ export function createHud(
     },
     setMode(next) {
       mode = next;
+      // 切り替えパネルの幅（キーの手がかりの有無）に合わせて案内の幅を変えるため、CSS に操作方法を渡す
+      el.dataset.mode = mode;
       renderGuide();
       recenter.hidden = mode !== 'tilt';
       // キーの手がかりはキーボードのある操作（マウス）のときだけ出す

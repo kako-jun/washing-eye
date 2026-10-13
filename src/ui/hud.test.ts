@@ -91,6 +91,23 @@ describe('HUD の CSS', () => {
   });
 });
 
+describe('HUD の CSS（切り替えパネルと案内パネル）', () => {
+  it('切り替えパネルは固定幅で、マウス操作（キーの手がかり付き）では広い', () => {
+    expect(css).toMatch(/\.hud \{\s*--tools-w: 128px;/);
+    expect(css).toMatch(/\.hud\[data-mode='mouse'\] \{\s*--tools-w: 156px;/);
+    expect(css).toMatch(/\.tools \{[^}]*width: var\(--tools-w\);/);
+  });
+
+  it('案内パネルの最大幅は、切り替えパネルの幅と右の余白を差し引いて決める（狭い幅でも上書きしない）', () => {
+    expect(css).toMatch(
+      /\.guide \{[^}]*max-width: min\(360px, calc\(100% - var\(--gutter\) - var\(--tools-right\) - var\(--tools-w\) - 8px\)\);/,
+    );
+    const narrow = css.slice(css.indexOf('@media (max-width: 420px)'));
+    const guideInNarrow = narrow.slice(narrow.indexOf('.guide {'), narrow.indexOf('}', narrow.indexOf('.guide {')));
+    expect(guideInNarrow).not.toContain('max-width');
+  });
+});
+
 describe('HUD 表示', () => {
   it('setShowerOn でシャワーボタンと照準の is-on、aria-pressed が切り替わる', () => {
     const h = hud();
@@ -184,6 +201,13 @@ describe('HUD 道具の切り替え', () => {
     expect(showerButton().hasAttribute('aria-describedby')).toBe(false);
   });
 
+  it('操作方法を data-mode に出す（切り替えパネルの幅に合わせて案内の幅を変えるため）', () => {
+    const h = hud();
+    h.setMode('touch');
+    expect(q<HTMLElement>('.hud').dataset.mode).toBe('touch');
+    h.setMode('mouse');
+    expect(q<HTMLElement>('.hud').dataset.mode).toBe('mouse');
+  });
 
   it('手持ちシャワーの間は、案内が流し方と「固定シャワーは使えない」に変わる', () => {
     const h = hud();
