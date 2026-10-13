@@ -54,6 +54,9 @@ export class Mirror {
       clipBias: 0.003,
       multisample: opts.multisample,
     });
+    // トゥーン調で HDR は要らないので、反射の描画先は端末の互換性が高い 8bit にする（既定は HalfFloat）。
+    // 描画先の実体は最初に描くときに作られるので、ここで型を変えれば足りる
+    this.surface.getRenderTarget().texture.type = THREE.UnsignedByteType;
     this.surface.userData.surface = MIRROR_SURFACE;
     this.surface.position.copy(this.center);
     this.group.add(this.surface);
@@ -130,6 +133,18 @@ export class Mirror {
     if (this.fog.update(dt)) this.fogDirty = true;
     this.sinceUpload += dt;
     if (this.fogDirty && this.sinceUpload >= FOG_UPLOAD_INTERVAL) this.upload();
+  }
+
+  /** 反射の描画先・曇りのテクスチャ・ジオメトリ・マテリアルを解放する */
+  dispose(): void {
+    this.surface.dispose(); // 反射の描画先と反射のマテリアル
+    this.fogTexture?.dispose();
+    this.group.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.geometry.dispose();
+      if (mesh !== this.surface) (mesh.material as THREE.Material).dispose();
+    });
   }
 
   private upload(): void {

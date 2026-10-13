@@ -13,6 +13,14 @@ beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
 });
 
+/** 曇りの見た目の更新を確かめるための、2D コンテキストの代わり */
+function fakeContext() {
+  return {
+    createImageData: (w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h }),
+    putImageData: vi.fn(),
+  };
+}
+
 function mirror() {
   return new Mirror({
     center: new THREE.Vector3(0, 1, -1.1),
@@ -71,6 +79,45 @@ describe('鏡', () => {
     expect(reflection.layers.isEnabled(VIEW_ONLY_LAYER)).toBe(false);
     expect(camera.layers.isEnabled(MIRROR_LAYER)).toBe(false);
     expect(camera.layers.isEnabled(VIEW_ONLY_LAYER)).toBe(true);
+  });
+});
+
+describe('鏡の描画先と解放', () => {
+  it('反射の描画先は 8bit（HalfFloat より端末の互換性が高い。トゥーン調で HDR は要らない）', () => {
+    const m = mirror();
+    expect(m.surface.getRenderTarget().texture.type).toBe(THREE.UnsignedByteType);
+  });
+
+  it('反射の描画先は長辺が指定の解像度（512px 以下）で、鏡の縦横比に合わせる', () => {
+    const m = mirror();
+    const rt = m.surface.getRenderTarget();
+    expect(rt.width).toBe(256);
+    expect(rt.height).toBe(192);
+    const big = new Mirror({
+      center: new THREE.Vector3(),
+      width: 1,
+      height: 1,
+      textureSize: 2048,
+      updateEvery: 1,
+      multisample: 0,
+    });
+    expect(big.surface.getRenderTarget().width).toBe(512);
+  });
+
+  it('dispose で反射の描画先・曇りのテクスチャ・ジオメトリ・マテリアルを解放する', () => {
+    vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(fakeContext() as any);
+    const m = mirror();
+    const rt = vi.spyOn(m.surface.getRenderTarget(), 'dispose');
+    const fogTexture = (m as any).fogTexture as THREE.Texture;
+    const tex = vi.spyOn(fogTexture, 'dispose');
+    const geometries: ReturnType<typeof vi.spyOn>[] = [];
+    m.group.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) geometries.push(vi.spyOn((o as THREE.Mesh).geometry, 'dispose'));
+    });
+    m.dispose();
+    expect(rt).toHaveBeenCalled();
+    expect(tex).toHaveBeenCalled();
+    for (const g of geometries) expect(g).toHaveBeenCalled();
   });
 });
 
