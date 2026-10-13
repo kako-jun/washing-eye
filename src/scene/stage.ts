@@ -99,6 +99,28 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
   return { scene, camera, renderer, showerHead, resize };
 }
 
+/**
+ * 画面の拡大率（devicePixelRatio）の変化を見張る。別の解像度のモニタへウィンドウを移したときなど、
+ * resize が来ない変化にも追従するため、今の倍率に一致する resolution のメディアクエリが外れたら知らせる。
+ * 戻り値は見張りをやめる関数。
+ */
+export function watchPixelRatio(
+  win: Pick<Window, 'devicePixelRatio' | 'matchMedia'>,
+  onChange: () => void,
+): () => void {
+  let mq: MediaQueryList | null = null;
+  const listen = () => {
+    mq = win.matchMedia(`(resolution: ${win.devicePixelRatio || 1}dppx)`);
+    mq.addEventListener('change', handle, { once: true });
+  };
+  const handle = () => {
+    onChange();
+    listen(); // 新しい倍率で見張り直す
+  };
+  listen();
+  return () => mq?.removeEventListener('change', handle);
+}
+
 function createTileTexture(): THREE.CanvasTexture {
   const size = 256;
   const c = document.createElement('canvas');

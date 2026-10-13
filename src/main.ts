@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import './ui/style.css';
-import { createStage } from './scene/stage';
+import { createStage, watchPixelRatio } from './scene/stage';
 import { createBody } from './body/createBody';
 import { DEFAULT_BODY } from './body/params';
 import { Foam } from './foam/foam';
@@ -113,6 +113,7 @@ const onResize = () => {
   steam.setViewportHeight(renderer.domElement.height, camera.fov);
 };
 window.addEventListener('resize', onResize);
+watchPixelRatio(window, onResize);
 onResize();
 
 // シャワーの狙い: 視線の中心のレイが体に当たる点。外れたら前方 1m
