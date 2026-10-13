@@ -9,6 +9,15 @@ const YAW_LIMIT = THREE.MathUtils.degToRad(110);
  */
 const YAW_FADE_START = THREE.MathUtils.degToRad(70);
 const YAW_FADE_END = THREE.MathUtils.degToRad(88);
+/**
+ * 減衰中にヨーが本来の向きへ追いつく速さ（1/秒）。重み w に対し w/(1-w) 倍して使う。
+ * 時間（秒）で効かせるので、端末の通知頻度が違っても同じ速さで追いつく。
+ */
+const YAW_FOLLOW_RATE = 40;
+/** 通知の間隔として扱う上限（秒）。間が空いたときに一気に追いつきすぎないように */
+const MAX_TILT_DT = 0.25;
+/** 前の通知が無いときに仮定する間隔（秒） */
+const DEFAULT_TILT_DT = 1 / 60;
 
 /**
  * 視線の制御。
@@ -22,7 +31,9 @@ export class LookController {
   private targetYaw = this.yaw;
   private targetPitch = this.pitch;
   private tiltActive = false;
+  /** 傾きのヨーの基準（正面）。null の間は、真下付近を向いていない通知が来たときに確定する */
   private yawOrigin: number | null = null;
+  private lastTiltStamp: number | null = null;
   private readonly euler = new THREE.Euler();
   private readonly q = new THREE.Quaternion();
   private readonly qScreen = new THREE.Quaternion();
@@ -98,11 +109,21 @@ export class LookController {
     this.q.multiply(this.qScreen.setFromAxisAngle(this.zee, -orient));
     this.euler.setFromQuaternion(this.q, 'YXZ');
 
-    if (this.yawOrigin === null) this.yawOrigin = this.euler.y;
-    const yaw = wrapAngle(this.euler.y - this.yawOrigin);
+    const stamp = e.timeStamp;
+    const dt =
+      this.lastTiltStamp === null || !Number.isFinite(stamp)
+        ? DEFAULT_TILT_DT
+        : THREE.MathUtils.clamp((stamp - this.lastTiltStamp) / 1000, 0, MAX_TILT_DT);
+    if (Number.isFinite(stamp)) this.lastTiltStamp = stamp;
+
     // 深く見下ろしているほどヨーの更新を弱める（真下付近の振れを視線に出さない）
     const weight = 1 - THREE.MathUtils.smoothstep(-this.euler.x, YAW_FADE_START, YAW_FADE_END);
-    this.targetYaw = clampYaw(this.targetYaw + weight * wrapAngle(yaw - this.targetYaw));
+    // 正面の確定（開始時・正面に戻す）は、真下付近の不安定なヨーを基準にしないよう、減衰が外れるまで待つ
+    if (this.yawOrigin === null && weight >= 1) this.yawOrigin = this.euler.y;
+    if (this.yawOrigin !== null) {
+      const yaw = wrapAngle(this.euler.y - this.yawOrigin);
+      this.targetYaw = clampYaw(this.targetYaw + yawFollow(weight, dt) * wrapAngle(yaw - this.targetYaw));
+    }
     this.targetPitch = THREE.MathUtils.clamp(this.euler.x, PITCH_MIN, PITCH_MAX);
 
     if (!this.tiltActive) {
@@ -110,6 +131,16 @@ export class LookController {
       this.onTilt?.();
     }
   }
+}
+
+/**
+ * 1 回の通知でヨーを本来の向きへ寄せる割合。重み 1 ならそのまま、0 なら動かさない。
+ * 間は 1 - exp(-k·dt) の形にして、通知の間隔を分割しても同じだけ寄るようにする。
+ */
+function yawFollow(weight: number, dt: number): number {
+  if (weight >= 1) return 1;
+  if (weight <= 0) return 0;
+  return 1 - Math.exp(-YAW_FOLLOW_RATE * (weight / (1 - weight)) * dt);
 }
 
 function wrapAngle(a: number): number {

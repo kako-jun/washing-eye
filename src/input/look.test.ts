@@ -17,16 +17,23 @@ function targets(look: LookController) {
   return { yaw: l.targetYaw as number, pitch: l.targetPitch as number };
 }
 
-function orientationEvent(alpha: number | null, beta: number | null, gamma: number | null): Event {
+function orientationEvent(
+  alpha: number | null,
+  beta: number | null,
+  gamma: number | null,
+  timeStamp?: number,
+): Event {
   const e = new Event('deviceorientation');
   Object.defineProperty(e, 'alpha', { value: alpha });
   Object.defineProperty(e, 'beta', { value: beta });
   Object.defineProperty(e, 'gamma', { value: gamma });
+  if (timeStamp !== undefined) Object.defineProperty(e, 'timeStamp', { value: timeStamp });
   return e;
 }
 
-function tilt(alpha: number | null, beta: number | null, gamma: number | null) {
-  window.dispatchEvent(orientationEvent(alpha, beta, gamma));
+/** timeStamp（ミリ秒）を渡すと、その時刻に届いた通知として扱う */
+function tilt(alpha: number | null, beta: number | null, gamma: number | null, timeStamp?: number) {
+  window.dispatchEvent(orientationEvent(alpha, beta, gamma, timeStamp));
 }
 
 /** requestPermission を持たない DeviceOrientationEvent（Android 等） */
@@ -343,11 +350,68 @@ describe('LookController 傾き入力 真下付近のヨー', () => {
 
   it('深めに見下ろす角度（約 80°）では、yaw は回した分の途中までしか変わらない', async () => {
     const look = await tiltLook();
-    tilt(0, 10, 0);
-    tilt(30, 10, 0);
+    tilt(0, 90, 0, 0); // 正面を決める
+    tilt(0, 10, 0, 16);
+    tilt(30, 10, 0, 32);
     const yaw = targets(look).yaw;
     expect(yaw).toBeGreaterThan(0);
     expect(yaw).toBeLessThan(deg(30) - deg(1));
+  });
+
+  it('減衰中の追いつき方は通知の頻度によらない（30Hz と 120Hz で 1 秒後の yaw が同じ）', async () => {
+    const run = async (hz: number) => {
+      const look = await tiltLook();
+      tilt(0, 90, 0, 0);
+      tilt(0, 10, 0, 0);
+      const stepMs = 1000 / hz;
+      for (let t = stepMs; t <= 1000 + 1e-9; t += stepMs) tilt(30, 10, 0, t);
+      return targets(look).yaw;
+    };
+    const slow = await run(30);
+    const fast = await run(120);
+    expect(slow).toBeGreaterThan(0);
+    expect(slow).toBeLessThan(deg(30));
+    expect(fast).toBeCloseTo(slow, 6);
+  });
+
+  it('減衰中でも、短い間隔で 1 回だけ届いた通知では少ししか寄らず、時間が経つほど寄る', async () => {
+    const at = async (ms: number) => {
+      const look = await tiltLook();
+      tilt(0, 90, 0, 0);
+      tilt(0, 10, 0, 0);
+      tilt(30, 10, 0, ms);
+      return targets(look).yaw;
+    };
+    const short = await at(4);
+    const long = await at(100);
+    expect(short).toBeGreaterThan(0);
+    expect(long).toBeGreaterThan(short);
+  });
+
+  it('最初の通知がほぼ真下なら正面を決めず、真下から外れた最初の通知の向きを正面にする', async () => {
+    const look = await tiltLook();
+    tilt(120, 1, 3, 0); // 真下: ヨーが不安定なので基準にしない
+    expect(targets(look).yaw).toBe(0);
+    tilt(50, 90, 0, 16); // 立てた姿勢: ここが正面
+    expect(targets(look).yaw).toBeCloseTo(0, 9);
+    tilt(80, 90, 0, 32);
+    expect(targets(look).yaw).toBeCloseTo(deg(30), 6);
+  });
+
+  it('真下付近で「正面に戻す」を押しても、不安定なヨーを正面にせず、真下から外れたときの向きを正面にする', async () => {
+    const look = await tiltLook();
+    tilt(0, 90, 0, 0);
+    tilt(40, 90, 0, 16);
+    expect(targets(look).yaw).toBeCloseTo(deg(40), 6);
+    tilt(40, 1, 0, 32); // 真下を向く
+    look.recenter();
+    tilt(170, 1, 5, 48); // 真下で向きが大きく揺れても、yaw は変わらない
+    tilt(-100, 2, -5, 64);
+    expect(targets(look).yaw).toBeCloseTo(deg(40), 3);
+    tilt(70, 90, 0, 80); // 真下から外れた: この向きが新しい正面
+    expect(targets(look).yaw).toBeCloseTo(0, 9);
+    tilt(100, 90, 0, 96);
+    expect(targets(look).yaw).toBeCloseTo(deg(30), 6);
   });
 
   it('真下から普通の角度に戻ると、また回した分だけ yaw が変わる', async () => {
