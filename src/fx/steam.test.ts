@@ -85,3 +85,68 @@ describe('湯気の漂い方', () => {
     expect(meanPos(flowing, 2)).toBeGreaterThan(meanPos(calm, 2));
   });
 });
+
+describe('湯気の量と立ちのぼり方（水の出方による違い）', () => {
+  /** 粒の状態をそろえた湯気（入れ替わりが起きないよう寿命の途中、速さ・種も一定） */
+  function steady(flow: number, count = 20) {
+    const s = new Steam(count);
+    const any = s as any;
+    any.life.fill(0.5);
+    any.speed.fill(0.1);
+    any.seed.fill(0);
+    any.pos.fill(0);
+    s.setFlow(flow);
+    return s;
+  }
+  const life = (s: Steam, i = 0) => (s as any).life[i] as number;
+  const y = (s: Steam, i = 0) => (s as any).pos[i * 3 + 1] as number;
+  const alpha = (s: Steam, i: number) => (s.points.geometry.getAttribute('aAlpha').array as Float32Array)[i];
+
+  it('水が出ていると寿命が 1.5 倍の速さで進む（入れ替わりが早い）', () => {
+    const calm = steady(0);
+    const flowing = steady(1);
+    calm.update(0.1);
+    flowing.update(0.1);
+    expect(life(calm) - 0.5).toBeCloseTo(0.1 * 0.1, 6);
+    expect(life(flowing) - 0.5).toBeCloseTo(0.1 * 0.1 * 1.5, 6);
+  });
+
+  it('水が出ていると 1.8 倍の速さで立ちのぼる', () => {
+    const calm = steady(0);
+    const flowing = steady(1);
+    calm.update(0.1);
+    flowing.update(0.1);
+    expect(y(calm)).toBeCloseTo(0.06 * 0.1, 6);
+    expect(y(flowing)).toBeCloseTo(0.06 * 1.8 * 0.1, 6);
+  });
+
+  it('ふだんは後ろの粒（全体の 45%）が見えず、水が出るとふわっと見えてくる', () => {
+    const n = 20;
+    const s = steady(0, n);
+    s.update(1 / 60);
+    expect(alpha(s, n - 1)).toBe(0);
+    expect(alpha(s, 0)).toBeGreaterThan(0);
+    s.setFlow(1);
+    s.update(1 / 60);
+    const early = alpha(s, n - 1);
+    expect(early).toBeGreaterThan(0);
+    for (let i = 0; i < 180; i++) s.update(1 / 60);
+    expect(alpha(s, n - 1)).toBeGreaterThan(early * 5); // 急に出ず、時間をかけて濃くなる
+  });
+
+  it('水が止まると、増えた粒はふわっと消えていく', () => {
+    const n = 20;
+    const s = steady(1, n);
+    for (let i = 0; i < 300; i++) s.update(1 / 60);
+    (s as any).life.fill(0.5);
+    s.setFlow(0);
+    s.update(1 / 60);
+    const justAfter = alpha(s, n - 1);
+    expect(justAfter).toBeGreaterThan(0);
+    for (let i = 0; i < 300; i++) {
+      (s as any).life.fill(0.5);
+      s.update(1 / 60);
+    }
+    expect(alpha(s, n - 1)).toBeLessThan(justAfter * 0.1);
+  });
+});

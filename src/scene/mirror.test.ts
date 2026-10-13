@@ -135,6 +135,99 @@ describe('鏡の描画先と解放', () => {
   });
 });
 
+describe('反射の描き直しの間引き（鏡に組み込んだ状態）', () => {
+  /** three の Reflector が反射を描くときに使う分だけを持つ、描画器の代わり */
+  function fakeRenderer() {
+    return {
+      render: vi.fn(),
+      getRenderTarget: () => null,
+      setRenderTarget: vi.fn(),
+      clear: vi.fn(),
+      autoClear: true,
+      xr: { enabled: false },
+      shadowMap: { autoUpdate: true },
+      state: { buffers: { depth: { setMask: vi.fn() } }, viewport: vi.fn() },
+    };
+  }
+
+  function renderFrames(updateEvery: number, frames: number) {
+    const m = new Mirror({
+      center: new THREE.Vector3(0, 1, -1.1),
+      width: 0.8,
+      height: 0.6,
+      textureSize: 128,
+      updateEvery,
+      multisample: 0,
+    });
+    m.group.updateMatrixWorld(true);
+    const camera = new THREE.PerspectiveCamera(70, 1, 0.03, 30);
+    camera.position.set(0, 1, 0); // 鏡の正面から見る
+    camera.updateMatrixWorld();
+    const renderer = fakeRenderer();
+    const scene = new THREE.Scene();
+    for (let i = 0; i < frames; i++) {
+      (m.surface.onBeforeRender as any)(renderer, scene, camera, m.surface.geometry, m.surface.material, null);
+    }
+    return renderer.render.mock.calls.length;
+  }
+
+  it('updateEvery=2（スマホ）なら、反射は 1 フレームおきにだけ描き直す', () => {
+    expect(renderFrames(2, 6)).toBe(3);
+  });
+
+  it('updateEvery=1（PC）なら、毎フレーム描き直す', () => {
+    expect(renderFrames(1, 6)).toBe(6);
+  });
+});
+
+describe('曇りの見た目の更新', () => {
+  function withContext() {
+    const ctx = fakeContext();
+    vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(ctx as any);
+    const m = mirror();
+    const texture = (m as any).fogTexture as THREE.Texture;
+    return { m, ctx, texture };
+  }
+
+  it('作った時点で一度、曇りを書き込む', () => {
+    const { ctx } = withContext();
+    expect(ctx.putImageData).toHaveBeenCalledTimes(1);
+  });
+
+  it('曇りが変わっても、更新は 1/15 秒おきにまとめる（毎フレームは書き込まない）', () => {
+    const { m, ctx, texture } = withContext();
+    const v0 = texture.version;
+    m.clearAt(new THREE.Vector3(0, 1, -1.1), 0.12, 1, 1 / 60);
+    m.update(1 / 60);
+    m.update(1 / 60);
+    expect(ctx.putImageData).toHaveBeenCalledTimes(1);
+    expect(texture.version).toBe(v0);
+    m.update(1 / 60);
+    m.update(1 / 60); // 4/60 秒 ≥ 1/15 秒
+    expect(ctx.putImageData).toHaveBeenCalledTimes(2);
+    expect(texture.version).toBe(v0 + 1); // needsUpdate で GPU に送り直す
+  });
+
+  it('書き込む画素は曇りの濃さ（晴れた所は暗い灰色）', () => {
+    const { m, ctx } = withContext();
+    for (let i = 0; i < 30; i++) m.clearAt(new THREE.Vector3(0, 1, -1.1), 0.12, 1, 1 / 60);
+    m.update(0.1);
+    const image = ctx.putImageData.mock.calls.at(-1)![0] as ImageData;
+    const cols = m.fog.cols;
+    const rows = m.fog.rows;
+    const center = ((Math.floor(rows / 2)) * cols + Math.floor(cols / 2)) * 4;
+    expect(image.data[center + 1]).toBeLessThan(40);
+    expect(image.data[1]).toBe(255); // 左上の隅は曇ったまま
+  });
+
+  it('曇りきって変化がない間は書き込まない', () => {
+    const { m, ctx } = withContext();
+    m.update(1);
+    m.update(1);
+    expect(ctx.putImageData).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('鏡に映る頭', () => {
   it('鏡用のレイヤーにだけ置かれ、一人称カメラ（既定のレイヤー）には映らない', () => {
     const head = createMirrorHead(DEFAULT_BODY, MIRROR_LAYER);
