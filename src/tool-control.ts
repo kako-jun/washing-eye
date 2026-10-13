@@ -22,6 +22,8 @@ export interface ToolControl {
   readonly tools: ToolState;
   /** 固定シャワーの入力 */
   readonly showerInput: ShowerInput;
+  /** キー・ウィンドウ・ドキュメントのリスナーをすべて外す */
+  dispose(): void;
 }
 
 /**
@@ -41,7 +43,7 @@ export function createToolControl(opts: ToolControlOptions): ToolControl {
     if (tool === 'handShower') showerInput.releaseAll();
   });
   hud.setTool(tools.current);
-  bindToolKeys({ target, tools, isStarted });
+  const unbindKeys = bindToolKeys({ target, tools, isStarted });
 
   const showerInput = createShowerInput({
     target,
@@ -55,10 +57,21 @@ export function createToolControl(opts: ToolControlOptions): ToolControl {
     },
   });
 
-  target.addEventListener('blur', () => pointer.cancel());
-  doc.addEventListener('visibilitychange', () => {
+  const onBlur = () => pointer.cancel();
+  const onVisibility = () => {
     if (doc.visibilityState === 'hidden') pointer.cancel();
-  });
+  };
+  target.addEventListener('blur', onBlur);
+  doc.addEventListener('visibilitychange', onVisibility);
 
-  return { tools, showerInput };
+  return {
+    tools,
+    showerInput,
+    dispose() {
+      unbindKeys();
+      showerInput.dispose();
+      target.removeEventListener('blur', onBlur);
+      doc.removeEventListener('visibilitychange', onVisibility);
+    },
+  };
 }

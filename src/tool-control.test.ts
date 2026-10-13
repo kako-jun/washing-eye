@@ -41,7 +41,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  control.showerInput.dispose();
+  control.dispose();
   document.body.innerHTML = '';
 });
 
@@ -111,5 +111,17 @@ describe('道具の持ち替えと固定シャワーの配線', () => {
     visibility = 'hidden';
     document.dispatchEvent(new Event('visibilitychange'));
     expect(pointer.cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispose 後はキー 1 / 2・Space・フォーカス喪失・タブ非表示のどれにも反応しない', () => {
+    control.dispose();
+    key('keydown', 'Digit2');
+    key('keydown', 'Space');
+    window.dispatchEvent(new Event('blur'));
+    visibility = 'hidden';
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(control.tools.current).toBe('sponge');
+    expect(fixedShower.setOn).not.toHaveBeenCalled();
+    expect(pointer.cancel).not.toHaveBeenCalled();
   });
 });
