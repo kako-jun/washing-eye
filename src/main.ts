@@ -10,7 +10,7 @@ import { Sponge } from './input/sponge';
 import { createShowerInput } from './input/shower-input';
 import { Steam } from './fx/steam';
 import { Shower } from './fx/shower';
-import { SoundBoard, bindAudioToVisibility } from './fx/audio';
+import { SoundBoard, bindAudioResumeOnGesture, bindAudioToVisibility } from './fx/audio';
 import { showStartScreen } from './ui/start';
 import { createHud, type ControlMode } from './ui/hud';
 
@@ -41,6 +41,7 @@ scene.add(shower.group);
 
 const sound = new SoundBoard();
 const unbindAudio = bindAudioToVisibility(document, sound);
+const unbindAudioGesture = bindAudioResumeOnGesture(window, document, sound);
 const look = new LookController();
 
 const FOAM_RADIUS = 0.016;
@@ -119,6 +120,7 @@ import.meta.hot?.dispose(() => {
   pointer.dispose();
   showerInput.dispose();
   unbindAudio();
+  unbindAudioGesture();
   window.removeEventListener('resize', onResize);
   renderer.setAnimationLoop(null);
 });

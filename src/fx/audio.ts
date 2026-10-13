@@ -15,7 +15,7 @@ export class SoundBoard {
   /** ユーザー操作の中で呼ぶ（iOS の自動再生制限のため） */
   start(): void {
     if (this.ctx) {
-      void this.ctx.resume();
+      this.resume();
       return;
     }
     const Ctor =
@@ -24,7 +24,8 @@ export class SoundBoard {
     if (!Ctor) return;
     const ctx = new Ctor();
     this.ctx = ctx;
-    void ctx.resume();
+    // 再開に失敗しても（自動再生制限など）、次のユーザー操作でやり直す
+    void ctx.resume().catch(() => {});
 
     this.master = ctx.createGain();
     this.master.gain.value = 0.9;
@@ -103,6 +104,11 @@ export class SoundBoard {
   suspend(): void {
     if (!this.ctx || this.ctx.state === 'closed') return;
     void this.ctx.suspend().catch(() => {});
+  }
+
+  /** 開始済みなのに音が止まっているか（iOS で復帰後の再開に失敗した、など） */
+  get needsResume(): boolean {
+    return !!this.ctx && this.ctx.state !== 'running' && this.ctx.state !== 'closed';
   }
 
   /** 止めた音を戻す（タブに戻ったとき）。開始前は何もしない */
@@ -187,4 +193,25 @@ export function bindAudioToVisibility(
   };
   doc.addEventListener('visibilitychange', onChange);
   return () => doc.removeEventListener('visibilitychange', onChange);
+}
+
+/**
+ * 音が止まったままなら、次のユーザー操作（pointerdown / keydown）の中で再開をやり直す。
+ * iOS ではタブ復帰時の resume が拒否されることがあり、ユーザー操作の中でなら再開できるため。
+ * 戻り値はリスナーを外す関数。
+ */
+export function bindAudioResumeOnGesture(
+  target: Pick<EventTarget, 'addEventListener' | 'removeEventListener'>,
+  doc: Pick<Document, 'visibilityState'>,
+  sound: Pick<SoundBoard, 'resume' | 'needsResume'>,
+): () => void {
+  const onGesture = () => {
+    if (doc.visibilityState === 'visible' && sound.needsResume) sound.resume();
+  };
+  target.addEventListener('pointerdown', onGesture, true);
+  target.addEventListener('keydown', onGesture, true);
+  return () => {
+    target.removeEventListener('pointerdown', onGesture, true);
+    target.removeEventListener('keydown', onGesture, true);
+  };
 }
