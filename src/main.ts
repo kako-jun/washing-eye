@@ -12,6 +12,7 @@ import { Steam } from './fx/steam';
 import { Shower } from './fx/shower';
 import { SoundBoard, bindAudioResumeOnGesture, bindAudioToVisibility } from './fx/audio';
 import { showStartScreen } from './ui/start';
+import { createGameStart } from './game-start';
 import { createHud, type ControlMode } from './ui/hud';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#view')!;
@@ -98,15 +99,21 @@ createShowerInput({
     hud.setShowerOn(on);
   },
 });
-showStartScreen(uiRoot, isTouch, async () => {
-  sound.start();
-  if (isTouch) {
-    // iOS の傾き許可はこのタップの中で求める。値が届いたら傾きモードに切り替える
-    await look.enableTilt(() => setMode('tilt'));
-  }
-  started = true;
-  hud.show();
-});
+showStartScreen(
+  uiRoot,
+  isTouch,
+  // iOS の傾き許可はこのタップの中で求める。値が届いたら傾きモードに切り替える
+  createGameStart({
+    sound,
+    look,
+    isTouch,
+    onTiltActive: () => setMode('tilt'),
+    onStarted: () => {
+      started = true;
+      hud.show();
+    },
+  }),
+);
 
 const onResize = () => {
   stage.resize();
