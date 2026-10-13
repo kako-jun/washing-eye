@@ -141,7 +141,7 @@ window.addEventListener('resize', onResize);
 watchPixelRatio(window, onResize);
 onResize();
 
-// シャワーの狙い: 視線の中心のレイが体に当たる点。外れたら前方 1m
+// 固定シャワーの狙い: 視線の中心のレイが体に当たる点。外れたら前方 1m
 const center = new THREE.Vector2(0, 0);
 const aimRay = new THREE.Raycaster();
 const aimPoint = new THREE.Vector3();
