@@ -37,4 +37,22 @@ describe('シャワーの水', () => {
     expect(shower.flowLevel).toBeLessThan(0.01);
     expect(shower.group.visible).toBe(false);
   });
+
+  it('止まっていた水を出し直すと、最初のフレームから今のヘッドと狙い点の間を流れる（前の位置の水滴が残らない）', () => {
+    const shower = new Shower(new THREE.Vector3(0, 1.5, -1), 40);
+    shower.aim(new THREE.Vector3(0, 0, 0));
+    shower.setOn(true);
+    for (let i = 0; i < 60; i++) shower.update(1 / 60, null);
+    shower.setOn(false);
+    for (let i = 0; i < 120; i++) shower.update(1 / 60, null);
+    // 別の場所で出し直す
+    const head = new THREE.Vector3(0.5, 0.6, 0.3);
+    const target = new THREE.Vector3(0.5, 0.4, 0.4);
+    shower.setHead(head);
+    shower.aim(target);
+    shower.setOn(true);
+    for (let i = 0; i < 3; i++) shower.update(1 / 60, null);
+    const box = new THREE.Box3().setFromPoints([head, target]).expandByScalar(0.12);
+    for (const p of streakPoints(shower)) expect(box.containsPoint(p)).toBe(true);
+  });
 });

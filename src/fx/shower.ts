@@ -22,6 +22,7 @@ export class Shower {
   private readonly splashLife: Float32Array;
   private readonly splashMat: THREE.PointsMaterial;
   private on = false;
+  private respawnPending = false;
   /** 0〜1。出始め・止め際をなめらかにする */
   private flow = 0;
   private readonly tmp = new THREE.Vector3();
@@ -66,6 +67,8 @@ export class Shower {
   }
 
   setOn(on: boolean): void {
+    // 止まっていた状態から出すときは、前の位置へ向かっていた古い水滴を今のヘッド・狙い点から出し直す
+    if (on && !this.on && this.flow < 0.05) this.respawnPending = true;
     this.on = on;
   }
 
@@ -90,6 +93,10 @@ export class Shower {
     this.splashMat.opacity = 0.8 * this.flow;
     this.group.visible = this.flow > 0.01;
     if (!this.group.visible) return;
+    if (this.respawnPending) {
+      this.respawnPending = false;
+      for (let i = 0; i < this.n; i++) this.spawn(i, Math.random());
+    }
 
     const g = -4.5;
     for (let i = 0; i < this.n; i++) {
