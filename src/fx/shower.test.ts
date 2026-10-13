@@ -55,4 +55,11 @@ describe('シャワーの水', () => {
     const box = new THREE.Box3().setFromPoints([head, target]).expandByScalar(0.12);
     for (const p of streakPoints(shower)) expect(box.containsPoint(p)).toBe(true);
   });
+
+  it('出してすぐ止めたら（次の update より前）、出し直しの予約は残らない', () => {
+    const shower = new Shower(new THREE.Vector3(0, 1, 0), 10);
+    shower.setOn(true);
+    shower.setOn(false);
+    expect((shower as any).respawnPending).toBe(false);
+  });
 });

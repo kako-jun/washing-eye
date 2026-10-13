@@ -69,6 +69,8 @@ export class Shower {
   setOn(on: boolean): void {
     // 止まっていた状態から出すときは、前の位置へ向かっていた古い水滴を今のヘッド・狙い点から出し直す
     if (on && !this.on && this.flow < 0.05) this.respawnPending = true;
+    // 出し直す前に止めたら、出し直しの予約も取り消す（止まったまま次に出すときに改めて予約する）
+    if (!on) this.respawnPending = false;
     this.on = on;
   }
 
