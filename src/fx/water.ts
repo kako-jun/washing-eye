@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { SurfaceHit } from '../input/pointer';
+import type { SurfaceHit, SurfaceKind } from '../input/pointer';
 
 /** 泡を流し始める水の出方の下限 */
 export const RINSE_MIN_FLOW = 0.2;
@@ -9,16 +9,26 @@ export const RINSE_MIN_FLOW = 0.2;
  * ホバー中の当て先（目印）とは別に持つ。
  */
 export class HandShowerAim {
-  /** 水の落ちる点（体から外れている間は、最後に当たっていた点を保つ） */
+  /** 水の落ちる点（当て先から外れている間は、最後に当たっていた点を保つ） */
   readonly point = new THREE.Vector3();
   readonly normal = new THREE.Vector3(0, 1, 0);
+  /** 水が当たっている面（体・鏡）。どちらからも外れていれば null */
+  surface: SurfaceKind | null = null;
+
   /** 水が体に当たっているか（外れていれば泡は流さない） */
-  onBody = false;
+  get onBody(): boolean {
+    return this.surface === 'body';
+  }
+
+  /** 水が鏡に当たっているか（当たっていれば曇りを取る） */
+  get onMirror(): boolean {
+    return this.surface === 'mirror';
+  }
 
   /** PointerInput の onAim から呼ぶ。spraying が false（ホバー）のときは水の落ちる点を動かさない */
   track(hit: SurfaceHit | null, spraying: boolean): void {
     if (!spraying) return;
-    this.onBody = !!hit;
+    this.surface = hit ? (hit.kind ?? 'body') : null;
     if (hit) {
       this.point.copy(hit.point);
       this.normal.copy(hit.normal);
@@ -35,30 +45,45 @@ export class HandShowerAim {
 export interface WaterSource {
   /** 水の出方（0〜1） */
   flow: number;
-  /** 水の落ちる点。体に当たっていなければ null */
+  /** 水の落ちる点。体にも鏡にも当たっていなければ null */
   point: THREE.Vector3 | null;
+  /** 水が当たっている面。省略時は体 */
+  kind?: SurfaceKind;
 }
 
 /**
  * 2 つのシャワーの水の出方と落ちる点をまとめる（main とテストで同じ組み立てを使う）。
- * - 固定シャワー: 視線の中心のレイが体に当たった点（当たらなければ null）
- * - 手持ちシャワー: 水の落ちる点（体に当たっていなければ null）
+ * - 固定シャワー: 視線の中心のレイが体・鏡に当たった点（当たらなければ null）
+ * - 手持ちシャワー: 水の落ちる点（体・鏡に当たっていなければ null）
  */
 export function waterSources(
-  fixed: { flow: number; hitPoint: THREE.Vector3 | null },
-  hand: { flow: number; aim: Pick<HandShowerAim, 'point' | 'onBody'> },
+  fixed: { flow: number; hit: SurfaceHit | null },
+  hand: { flow: number; aim: Pick<HandShowerAim, 'point' | 'surface'> },
 ): WaterSource[] {
   return [
-    { flow: fixed.flow, point: fixed.hitPoint },
-    { flow: hand.flow, point: hand.aim.onBody ? hand.aim.point : null },
+    { flow: fixed.flow, point: fixed.hit?.point ?? null, kind: fixed.hit?.kind ?? 'body' },
+    { flow: hand.flow, point: hand.aim.surface ? hand.aim.point : null, kind: hand.aim.surface ?? 'body' },
   ];
 }
 
-/** 泡を流す中心と強さ。水の落ちる点を中心に、ある程度出ている水だけ */
-export function rinseTargets(sources: WaterSource[]): { point: THREE.Vector3; flow: number }[] {
+/** ある程度出ていて、指定の面に落ちている水 */
+function landingOn(sources: WaterSource[], kind: SurfaceKind): { point: THREE.Vector3; flow: number }[] {
   return sources
-    .filter((s): s is { flow: number; point: THREE.Vector3 } => s.flow > RINSE_MIN_FLOW && !!s.point)
+    .filter(
+      (s): s is WaterSource & { point: THREE.Vector3 } =>
+        s.flow > RINSE_MIN_FLOW && !!s.point && (s.kind ?? 'body') === kind,
+    )
     .map((s) => ({ point: s.point, flow: s.flow }));
+}
+
+/** 泡を流す中心と強さ。体に落ちている水の、落ちる点を中心にする */
+export function rinseTargets(sources: WaterSource[]): { point: THREE.Vector3; flow: number }[] {
+  return landingOn(sources, 'body');
+}
+
+/** 鏡の曇りを取る中心と強さ。鏡に落ちている水の、落ちる点を中心にする */
+export function mirrorTargets(sources: WaterSource[]): { point: THREE.Vector3; flow: number }[] {
+  return landingOn(sources, 'mirror');
 }
 
 /** 水音・湯気に使う水の量。強い方に合わせる */

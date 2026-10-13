@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { HandShowerAim, RINSE_MIN_FLOW, rinseTargets, waterLevel, waterSources } from './water';
+import { HandShowerAim, RINSE_MIN_FLOW, mirrorTargets, rinseTargets, waterLevel, waterSources } from './water';
 
 const hit = (x: number) => ({ point: new THREE.Vector3(x, 0, 0), normal: new THREE.Vector3(0, 0, 1) });
 
@@ -72,10 +72,10 @@ describe('2 つのシャワーの水をまとめる（main と同じ組み立て
     const aim = new HandShowerAim();
     aim.track(hit(0.4), true);
     const center = new THREE.Vector3(0, 0.5, 0);
-    const water = waterSources({ flow: 0.9, hitPoint: center }, { flow: 0.5, aim });
+    const water = waterSources({ flow: 0.9, hit: { point: center, normal: new THREE.Vector3(0, 0, 1) } }, { flow: 0.5, aim });
     expect(water).toEqual([
-      { flow: 0.9, point: center },
-      { flow: 0.5, point: aim.point },
+      { flow: 0.9, point: center, kind: 'body' },
+      { flow: 0.5, point: aim.point, kind: 'body' },
     ]);
     expect(rinseTargets(water).map((r) => r.point)).toEqual([center, aim.point]);
     expect(waterLevel(water)).toBe(0.9);
@@ -85,7 +85,7 @@ describe('2 つのシャワーの水をまとめる（main と同じ組み立て
     const aim = new HandShowerAim();
     aim.track(hit(0.4), true);
     aim.track(null, true);
-    const water = waterSources({ flow: 0.9, hitPoint: null }, { flow: 0.95, aim });
+    const water = waterSources({ flow: 0.9, hit: null }, { flow: 0.95, aim });
     expect(rinseTargets(water)).toEqual([]);
     expect(waterLevel(water)).toBe(0.95);
   });
@@ -94,7 +94,45 @@ describe('2 つのシャワーの水をまとめる（main と同じ組み立て
     const aim = new HandShowerAim();
     aim.track(hit(0.2), true);
     aim.track(hit(0.7), false); // ホバー
-    const [, hand] = waterSources({ flow: 0, hitPoint: null }, { flow: 0.5, aim });
+    const [, hand] = waterSources({ flow: 0, hit: null }, { flow: 0.5, aim });
     expect(hand.point!.x).toBeCloseTo(0.2, 9);
+  });
+});
+
+describe('鏡に当たる水', () => {
+  const mirrorHit = (x: number) => ({
+    point: new THREE.Vector3(x, 1, -1.1),
+    normal: new THREE.Vector3(0, 0, 1),
+    kind: 'mirror' as const,
+  });
+
+  it('手持ちシャワーの水が鏡に当たると、鏡に当たっている扱いになり、体には当たっていない', () => {
+    const aim = new HandShowerAim();
+    aim.track(mirrorHit(0.1), true);
+    expect(aim.onMirror).toBe(true);
+    expect(aim.onBody).toBe(false);
+    expect(aim.surface).toBe('mirror');
+  });
+
+  it('固定シャワーの視線の中心が鏡に当たれば、その点で鏡の曇りを取り、泡は流さない', () => {
+    const aim = new HandShowerAim();
+    const hit = mirrorHit(0);
+    const water = waterSources({ flow: 0.8, hit }, { flow: 0, aim });
+    expect(mirrorTargets(water)).toEqual([{ point: hit.point, flow: 0.8 }]);
+    expect(rinseTargets(water)).toEqual([]);
+  });
+
+  it('手持ちシャワーの当て先が鏡なら、その点で鏡の曇りを取る（固定シャワーが体に当たっていれば、そちらは泡を流す）', () => {
+    const aim = new HandShowerAim();
+    aim.track(mirrorHit(0.2), true);
+    const body = { point: new THREE.Vector3(0, 0.4, 0), normal: new THREE.Vector3(0, 1, 0) };
+    const water = waterSources({ flow: 0.7, hit: body }, { flow: 0.6, aim });
+    expect(mirrorTargets(water)).toEqual([{ point: aim.point, flow: 0.6 }]);
+    expect(rinseTargets(water)).toEqual([{ point: body.point, flow: 0.7 }]);
+  });
+
+  it('出始めのわずかな水では鏡の曇りは取れない', () => {
+    const water = waterSources({ flow: RINSE_MIN_FLOW, hit: mirrorHit(0) }, { flow: 0, aim: new HandShowerAim() });
+    expect(mirrorTargets(water)).toEqual([]);
   });
 });

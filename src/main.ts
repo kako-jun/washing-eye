@@ -181,7 +181,7 @@ renderer.setAnimationLoop((time: number) => {
 
   // 泡は水の落ちる点を中心に流す（固定: 視線の中心、手持ち: 当て先）。水音・湯気は強い方に合わせる
   const water = waterSources(
-    { flow: shower.flowLevel, hitPoint: aimHit ? aimPoint : null },
+    { flow: shower.flowLevel, hit: aimHit },
     { flow: handShower.flowLevel, aim: handAim },
   );
   for (const r of rinseTargets(water)) foam.rinse(r.point, RINSE_RADIUS, 2.6 * r.flow, dt);
