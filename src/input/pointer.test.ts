@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { LookController } from './look';
-import { PointerInput, type SurfaceHit } from './pointer';
+import { MIRROR_SURFACE, PointerInput, bodyHit, type SurfaceHit } from './pointer';
 import { createToolState, type ToolState } from './tool';
 
 /**
@@ -17,6 +17,8 @@ const OFF = 5; // 体の外
 let el: HTMLDivElement;
 let camera: THREE.OrthographicCamera;
 let plane: THREE.Mesh;
+let mirror: THREE.Mesh;
+const MIRROR = 87; // 鏡の上（画面の x）
 let look: { usingTilt: boolean; drag: Mock };
 let cb: { onScrub: Mock; onScrubEnd: Mock; onHover: Mock; onAim: Mock; onSpray: Mock };
 let input: PointerInput;
@@ -70,10 +72,16 @@ function setup(opts: { tilt?: boolean } = {}) {
   plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial());
   plane.updateMatrixWorld();
 
+  // 鏡: 画面の右寄り（x 80〜95px）に置く小さな面
+  mirror = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), new THREE.MeshBasicMaterial());
+  mirror.position.set(0.75, 0, 0);
+  mirror.userData.surface = MIRROR_SURFACE;
+  mirror.updateMatrixWorld();
+
   look = { usingTilt: opts.tilt ?? false, drag: vi.fn() };
   cb = { onScrub: vi.fn(), onScrubEnd: vi.fn(), onHover: vi.fn(), onAim: vi.fn(), onSpray: vi.fn() };
   tools = createToolState((_tool, prev) => input.toolChanged(prev));
-  input = new PointerInput(el, camera, [plane], look as unknown as LookController, cb, () => tools.current);
+  input = new PointerInput(el, camera, [plane, mirror], look as unknown as LookController, cb, () => tools.current);
 }
 
 const mode = () => (input as any).mode as string;
@@ -632,5 +640,54 @@ describe('PointerInput 手持ちシャワーを止めたときの目印', () => 
     expect(spraying).toBe(false);
     expect(hit).not.toBeNull();
     expect(hit!.point.x).toBeCloseTo(worldX(62), 6);
+  });
+});
+
+describe('PointerInput 鏡', () => {
+  it('当たった面の種類を返す（体は body、鏡は mirror）', () => {
+    expect(input.hitAt(ON, ON)!.kind).toBe('body');
+    expect(input.hitAt(MIRROR, ON)!.kind).toBe('mirror');
+    expect(bodyHit(input.hitAt(MIRROR, ON))).toBeNull();
+    expect(bodyHit({ point: new THREE.Vector3(), normal: new THREE.Vector3() })).not.toBeNull(); // 省略時は体
+  });
+
+  it('スポンジでは鏡の上を押してもこすらず、見回しになる', () => {
+    fire('pointerdown', { id: 1, x: MIRROR, y: ON });
+    expect(mode()).toBe('look');
+    expect(cb.onScrub).not.toHaveBeenCalled();
+  });
+
+  it('スポンジのホバーでは鏡の上にスポンジを出さない', () => {
+    fire('pointermove', { x: MIRROR, y: ON, pointerType: 'mouse' });
+    expect(cb.onHover).toHaveBeenLastCalledWith(null, false);
+  });
+
+  it('こすっている途中で鏡の上へ動かすと、スポンジは消える（鏡に泡は付かない）', () => {
+    fire('pointerdown', { id: 1, x: ON, y: ON });
+    cb.onScrub.mockClear();
+    fire('pointermove', { id: 1, x: MIRROR, y: ON });
+    input.update();
+    expect(cb.onHover).toHaveBeenLastCalledWith(null, true);
+    expect(cb.onScrub).not.toHaveBeenCalled();
+  });
+
+  it('手持ちシャワーでは鏡も当て先になる（ホバーで目印、押すと水が出る）', () => {
+    tools.set('handShower');
+    fire('pointermove', { x: MIRROR, y: ON, pointerType: 'mouse' });
+    expect(cb.onAim.mock.calls.at(-1)![0]!.kind).toBe('mirror');
+    fire('pointerdown', { id: 1, x: MIRROR, y: ON, pointerType: 'mouse' });
+    expect(mode()).toBe('spray');
+    expect(cb.onSpray).toHaveBeenLastCalledWith(true);
+    const [hit, spraying] = cb.onAim.mock.calls.at(-1)!;
+    expect(hit!.kind).toBe('mirror');
+    expect(spraying).toBe(true);
+  });
+
+  it('手持ちシャワーで体から鏡へ動かすと、当て先が鏡に移る', () => {
+    tools.set('handShower');
+    fire('pointerdown', { id: 1, x: ON, y: ON });
+    fire('pointermove', { id: 1, x: MIRROR, y: ON });
+    input.update();
+    expect(cb.onAim.mock.calls.at(-1)![0]!.kind).toBe('mirror');
   });
 });
