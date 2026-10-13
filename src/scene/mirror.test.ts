@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MIRROR_LAYER, Mirror } from './mirror';
+import { VIEW_ONLY_LAYER, setupFirstPersonLayers } from './layers';
 import { MIRROR_SURFACE } from '../input/pointer';
 import { REFOG_SECONDS } from '../fx/mirror-fog';
 import { createMirrorHead } from '../body/head';
@@ -61,12 +62,15 @@ describe('鏡', () => {
     expect(m.fog.sample(0.5, 0.5)).toBeCloseTo(1, 6);
   });
 
-  it('反射用のカメラは鏡用のレイヤーも描き、一人称カメラは描かない', () => {
+  it('鏡の反射用のカメラは鏡用のレイヤーを描き、一人称だけの効果（湯気・しぶき）は描かない', () => {
     const m = mirror();
     const camera = new THREE.PerspectiveCamera();
+    setupFirstPersonLayers(camera);
     const reflection = m.surface.getReflectionCamera(camera);
     expect(reflection.layers.isEnabled(MIRROR_LAYER)).toBe(true);
+    expect(reflection.layers.isEnabled(VIEW_ONLY_LAYER)).toBe(false);
     expect(camera.layers.isEnabled(MIRROR_LAYER)).toBe(false);
+    expect(camera.layers.isEnabled(VIEW_ONLY_LAYER)).toBe(true);
   });
 });
 

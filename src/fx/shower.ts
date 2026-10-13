@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { VIEW_ONLY_LAYER } from '../scene/layers';
 
 /**
  * シャワーの水。シャワーヘッドから狙った点へ向かう細い水筋（線分）と、当たった所のしぶき。
@@ -61,6 +62,8 @@ export class Shower {
     });
     this.splash = new THREE.Points(sg, this.splashMat);
     this.splash.frustumCulled = false;
+    // しぶきの粒の大きさは画面の高さ基準なので、小さな描画先の鏡の反射には描かない
+    this.splash.layers.set(VIEW_ONLY_LAYER);
     this.group.add(this.splash);
 
     for (let i = 0; i < count; i++) this.spawn(i, Math.random());

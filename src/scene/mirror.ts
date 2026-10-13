@@ -3,9 +3,9 @@ import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { MIRROR_SURFACE } from '../input/pointer';
 import { CLEAR_RATE, FogMask, createUpdateThrottle, mirrorUv } from '../fx/mirror-fog';
 import { createToonMaterial } from './toon';
+import { setupReflectionLayers } from './layers';
 
-/** 鏡にだけ映るもの（抽象的な頭）を置くレイヤー。一人称カメラはこのレイヤーを描かない */
-export const MIRROR_LAYER = 1;
+export { MIRROR_LAYER } from './layers';
 
 /** 曇りの見た目の更新間隔（秒）。マスクは小さいので、毎フレームでなくても滑らかに見える */
 const FOG_UPLOAD_INTERVAL = 1 / 15;
@@ -58,11 +58,11 @@ export class Mirror {
     this.surface.position.copy(this.center);
     this.group.add(this.surface);
 
-    // 鏡に映る抽象的な頭が見えるよう、反射用のカメラにだけ MIRROR_LAYER を足す
+    // 反射用のカメラは、鏡に映る抽象的な頭（MIRROR_LAYER）を描き、湯気・水しぶき（VIEW_ONLY_LAYER）は描かない
     const getReflectionCamera = this.surface.getReflectionCamera;
     this.surface.getReflectionCamera = (camera) => {
       const reflection = getReflectionCamera.call(this.surface, camera);
-      reflection.layers.enable(MIRROR_LAYER);
+      setupReflectionLayers(reflection);
       return reflection;
     };
 

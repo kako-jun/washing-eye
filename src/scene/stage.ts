@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createToonMaterial, getGradientMap } from './toon';
+import { setupFirstPersonLayers } from './layers';
 
 export interface Stage {
   scene: THREE.Scene;
@@ -39,6 +40,7 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
   scene.fog = new THREE.Fog(BACKGROUND, 2.2, 7.5);
 
   const camera = new THREE.PerspectiveCamera(70, 1, 0.03, 30);
+  setupFirstPersonLayers(camera);
   camera.position.copy(EYE_POSITION);
 
   // ライト: 明るく柔らかい環境光 + 窓から差すような暖かい主光 + 暖色の補助

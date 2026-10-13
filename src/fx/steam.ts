@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { VIEW_ONLY_LAYER } from '../scene/layers';
 
 /**
  * 湯気を流す風（m/s）。ふだんはごくゆっくり向きを変えながら漂い、
@@ -91,6 +92,8 @@ export class Steam {
 
     this.points = new THREE.Points(this.geo, this.material);
     this.points.frustumCulled = false;
+    // 粒の大きさは画面の高さ基準なので、小さな描画先の鏡の反射では膨らんで白く飛ぶ。一人称カメラにだけ描く
+    this.points.layers.set(VIEW_ONLY_LAYER);
     this.points.renderOrder = 10;
   }
 
