@@ -99,6 +99,18 @@ export class SoundBoard {
     this.nextDrip = ctx.currentTime + 2;
   }
 
+  /** 音を止める（タブを離れたとき）。開始前は何もしない */
+  suspend(): void {
+    if (!this.ctx || this.ctx.state === 'closed') return;
+    void this.ctx.suspend().catch(() => {});
+  }
+
+  /** 止めた音を戻す（タブに戻ったとき）。開始前は何もしない */
+  resume(): void {
+    if (!this.ctx || this.ctx.state === 'closed') return;
+    void this.ctx.resume().catch(() => {});
+  }
+
   /** こする強さ（体表上の速さ m/s）。0 で無音 */
   setScrub(speed: number): void {
     if (!this.ctx) return;
@@ -156,4 +168,23 @@ export class SoundBoard {
     }
     return buf;
   }
+}
+
+type VisibilityDoc = Pick<Document, 'addEventListener' | 'removeEventListener' | 'visibilityState'>;
+
+/**
+ * タブが隠れたら音を止め、見えたら戻す。
+ * 隠れている間も水音・こする音が鳴り続けるのを防ぎ、iOS で復帰後に無音のままになるのを防ぐ。
+ * 戻り値はリスナーを外す関数。
+ */
+export function bindAudioToVisibility(
+  doc: VisibilityDoc,
+  sound: Pick<SoundBoard, 'suspend' | 'resume'>,
+): () => void {
+  const onChange = () => {
+    if (doc.visibilityState === 'hidden') sound.suspend();
+    else sound.resume();
+  };
+  doc.addEventListener('visibilitychange', onChange);
+  return () => doc.removeEventListener('visibilitychange', onChange);
 }

@@ -10,7 +10,7 @@ import { Sponge } from './input/sponge';
 import { createShowerInput } from './input/shower-input';
 import { Steam } from './fx/steam';
 import { Shower } from './fx/shower';
-import { SoundBoard } from './fx/audio';
+import { SoundBoard, bindAudioToVisibility } from './fx/audio';
 import { showStartScreen } from './ui/start';
 import { createHud, type ControlMode } from './ui/hud';
 
@@ -40,6 +40,7 @@ const shower = new Shower(stage.showerHead);
 scene.add(shower.group);
 
 const sound = new SoundBoard();
+bindAudioToVisibility(document, sound);
 const look = new LookController();
 
 const FOAM_RADIUS = 0.016;
