@@ -82,9 +82,13 @@ export class Steam {
 
   update(dt: number): void {
     this.t += dt;
+    let respawned = false;
     for (let i = 0; i < this.n; i++) {
       this.life[i] += dt * this.speed[i];
-      if (this.life[i] >= 1) this.respawn(i, 0);
+      if (this.life[i] >= 1) {
+        this.respawn(i, 0);
+        respawned = true;
+      }
       const l = this.life[i];
       const s = this.seed[i];
       this.pos[i * 3] += Math.sin(this.t * 0.4 + s * 20) * 0.03 * dt;
@@ -95,6 +99,8 @@ export class Steam {
     }
     this.geo.attributes.position.needsUpdate = true;
     this.geo.attributes.aAlpha.needsUpdate = true;
+    // 入れ替わった粒は大きさの種も変わるので、GPU に送り直す
+    if (respawned) this.geo.attributes.aSeed.needsUpdate = true;
   }
 
   private respawn(i: number, life: number): void {
