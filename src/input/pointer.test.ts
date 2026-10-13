@@ -368,3 +368,36 @@ describe('PointerInput.update', () => {
     expect(look.drag).not.toHaveBeenCalled();
   });
 });
+
+describe('PointerInput のキャプチャ失敗と後始末', () => {
+  it('setPointerCapture が例外を投げても、こする操作は始まり、離せば待機に戻る', () => {
+    capture.mockImplementation(() => {
+      throw new DOMException('not active', 'InvalidStateError');
+    });
+    expect(() => fire('pointerdown', { id: 1, x: ON, y: ON })).not.toThrow();
+    expect(mode()).toBe('scrub');
+    fire('pointerup', { id: 1 });
+    expect(mode()).toBe('idle');
+    expect(cb.onScrubEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispose 後は押す・動かす・離す・右クリックメニューのどれにも反応しない', () => {
+    input.dispose();
+    fire('pointerdown', { id: 1, x: ON, y: ON });
+    fire('pointermove', { id: 1, x: 20, y: 20, pointerType: 'mouse' });
+    fire('pointerup', { id: 1 });
+    expect(mode()).toBe('idle');
+    expect(cb.onScrub).not.toHaveBeenCalled();
+    expect(cb.onHover).not.toHaveBeenCalled();
+    expect(capture).not.toHaveBeenCalled();
+    const menu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    el.dispatchEvent(menu);
+    expect(menu.defaultPrevented).toBe(false);
+  });
+
+  it('dispose 前は右クリックメニューを出さない', () => {
+    const menu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    el.dispatchEvent(menu);
+    expect(menu.defaultPrevented).toBe(true);
+  });
+});

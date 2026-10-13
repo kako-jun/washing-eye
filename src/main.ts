@@ -40,7 +40,7 @@ const shower = new Shower(stage.showerHead);
 scene.add(shower.group);
 
 const sound = new SoundBoard();
-bindAudioToVisibility(document, sound);
+const unbindAudio = bindAudioToVisibility(document, sound);
 const look = new LookController();
 
 const FOAM_RADIUS = 0.016;
@@ -87,7 +87,7 @@ setMode(isTouch ? 'touch' : 'mouse');
 let started = false;
 
 // シャワーはボタンの長押し／Space の、いずれかが押されている間だけ出る
-createShowerInput({
+const showerInput = createShowerInput({
   target: window,
   doc: document,
   button: hud.showerButton,
@@ -113,6 +113,15 @@ const onResize = () => {
 };
 window.addEventListener('resize', onResize);
 onResize();
+
+// 開発中のモジュール差し替えでは、古い入力のリスナーを外してから入れ替える
+import.meta.hot?.dispose(() => {
+  pointer.dispose();
+  showerInput.dispose();
+  unbindAudio();
+  window.removeEventListener('resize', onResize);
+  renderer.setAnimationLoop(null);
+});
 
 // シャワーの狙い: 視線の中心のレイが体に当たる点。外れたら前方 1m
 const center = new THREE.Vector2(0, 0);

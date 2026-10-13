@@ -47,7 +47,18 @@ export class PointerInput {
     // up/cancel が届かずにキャプチャが外れた場合も、同じ後始末をして操作が固まらないようにする
     el.addEventListener('lostpointercapture', this.end);
     el.addEventListener('pointerleave', this.leave);
-    el.addEventListener('contextmenu', (e) => e.preventDefault());
+    el.addEventListener('contextmenu', this.preventContextMenu);
+  }
+
+  /** リスナーをすべて外す */
+  dispose(): void {
+    this.el.removeEventListener('pointerdown', this.down);
+    this.el.removeEventListener('pointermove', this.move);
+    this.el.removeEventListener('pointerup', this.end);
+    this.el.removeEventListener('pointercancel', this.end);
+    this.el.removeEventListener('lostpointercapture', this.end);
+    this.el.removeEventListener('pointerleave', this.leave);
+    this.el.removeEventListener('contextmenu', this.preventContextMenu);
   }
 
   /** 画面座標から体表へのレイキャスト */
@@ -96,7 +107,11 @@ export class PointerInput {
     this.pointerId = e.pointerId;
     this.lastX = e.clientX;
     this.lastY = e.clientY;
-    this.el.setPointerCapture(e.pointerId);
+    try {
+      this.el.setPointerCapture(e.pointerId);
+    } catch {
+      // キャプチャできなくても操作は続ける（離したときの up は届く）
+    }
     this.el.classList.toggle('is-looking', this.mode === 'look');
   };
 
@@ -156,7 +171,7 @@ export class PointerInput {
 
   /** pointerup / pointercancel / lostpointercapture の共通の後始末（同じポインターで 2 回目以降は何もしない） */
   private end = (e: PointerEvent) => {
-    if (this.mode === 'idle' || e.pointerId !== this.pointerId) return;
+    if (e.pointerId !== this.pointerId) return;
     if (this.mode === 'scrub') this.cb.onScrubEnd();
     this.mode = 'idle';
     this.pointerId = -1;
@@ -164,6 +179,8 @@ export class PointerInput {
     this.el.classList.remove('is-looking');
     if (e.pointerType !== 'mouse') this.cb.onHover(null, false);
   };
+
+  private preventContextMenu = (e: Event) => e.preventDefault();
 
   private leave = (e: PointerEvent) => {
     if (this.mode === 'idle' && e.pointerType === 'mouse') {
