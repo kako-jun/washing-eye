@@ -19,6 +19,9 @@ export const BACKGROUND = new THREE.Color(0xdde7ea);
 /** 一人称の目の位置（腰掛けた状態の頭の中） */
 export const EYE_POSITION = new THREE.Vector3(0, 0.8, -0.03);
 
+/** 壁のタイルの色（明るい白に近い青灰） */
+export const WALL_COLOR = 0xeef3f4;
+
 /** 正面の壁の鏡の位置と大きさ（鏡は +Z を向く。目の高さで、少し見上げると自分が映る） */
 export const MIRROR_PLACEMENT = {
   center: new THREE.Vector3(0, 0.95, -1.145),
@@ -65,7 +68,7 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
   const wall = new THREE.Mesh(
     new THREE.PlaneGeometry(6, 4),
     new THREE.MeshToonMaterial({
-      color: 0xeef3f4,
+      color: WALL_COLOR,
       map: createTileTexture(),
       gradientMap: getGradientMap(),
     }),

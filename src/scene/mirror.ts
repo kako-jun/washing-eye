@@ -7,6 +7,11 @@ import { setupReflectionLayers } from './layers';
 
 export { MIRROR_LAYER } from './layers';
 
+/** 鏡の枠の色。曇った鏡・明るい壁と見分けられるよう、一段濃い青灰色にする */
+export const MIRROR_FRAME_COLOR = 0x8aa1a9;
+/** 曇りの色。壁のタイルより少し青みのある灰色にして、曇った鏡の面を壁と見分けられるようにする */
+export const MIRROR_FOG_COLOR = 0xdbe6ea;
+
 /** 曇りの見た目の更新間隔（秒）。マスクは小さいので、毎フレームでなくても滑らかに見える */
 const FOG_UPLOAD_INTERVAL = 1 / 15;
 
@@ -89,7 +94,7 @@ export class Mirror {
     const fogMesh = new THREE.Mesh(
       new THREE.PlaneGeometry(opts.width, opts.height),
       new THREE.MeshBasicMaterial({
-        color: 0xf1f6f7,
+        color: MIRROR_FOG_COLOR,
         transparent: true,
         opacity: 0.9,
         alphaMap: this.fogTexture,
@@ -101,7 +106,7 @@ export class Mirror {
     this.group.add(fogMesh);
 
     // 細い枠
-    const frameMat = createToonMaterial({ color: 0xdfe7ea, rimStrength: 0.15 });
+    const frameMat = createToonMaterial({ color: MIRROR_FRAME_COLOR, rimStrength: 0.15 });
     const t = 0.025;
     const bars: [number, number, number, number][] = [
       [0, opts.height / 2 + t / 2, opts.width + t * 2, t],

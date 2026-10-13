@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import * as THREE from 'three';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MIRROR_LAYER, Mirror } from './mirror';
+import { MIRROR_FOG_COLOR, MIRROR_FRAME_COLOR, MIRROR_LAYER, Mirror } from './mirror';
+import { WALL_COLOR } from './stage';
 import { VIEW_ONLY_LAYER, setupFirstPersonLayers } from './layers';
 import { MIRROR_SURFACE } from '../input/pointer';
 import { REFOG_SECONDS } from '../fx/mirror-fog';
@@ -79,6 +80,19 @@ describe('鏡', () => {
     expect(reflection.layers.isEnabled(VIEW_ONLY_LAYER)).toBe(false);
     expect(camera.layers.isEnabled(MIRROR_LAYER)).toBe(false);
     expect(camera.layers.isEnabled(VIEW_ONLY_LAYER)).toBe(true);
+  });
+});
+
+describe('鏡の見分けやすさ', () => {
+  const lum = (hex: number) => {
+    const c = new THREE.Color(hex);
+    return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+  };
+
+  it('枠は明るい壁よりはっきり暗く、曇りの面も壁とは違う色（鏡の場所が分かる）', () => {
+    expect(lum(WALL_COLOR) - lum(MIRROR_FRAME_COLOR)).toBeGreaterThan(0.3);
+    expect(MIRROR_FOG_COLOR).not.toBe(WALL_COLOR);
+    expect(lum(MIRROR_FOG_COLOR)).toBeLessThan(lum(WALL_COLOR));
   });
 });
 
