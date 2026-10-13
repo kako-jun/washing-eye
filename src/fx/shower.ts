@@ -37,7 +37,7 @@ export class Shower {
     this.lineGeo = new THREE.BufferGeometry();
     this.lineGeo.setAttribute('position', new THREE.BufferAttribute(this.lines, 3));
     this.lineMat = new THREE.LineBasicMaterial({
-      color: 0xbfe6f5,
+      color: 0x8ec7e0, // 明るい壁の前でも水筋が見えるよう、少し深い水色
       transparent: true,
       opacity: 0,
       depthWrite: false,
@@ -53,7 +53,7 @@ export class Shower {
     const sg = new THREE.BufferGeometry();
     sg.setAttribute('position', new THREE.BufferAttribute(this.splashPos, 3));
     this.splashMat = new THREE.PointsMaterial({
-      color: 0xe6f7ff,
+      color: 0xcfeefa,
       size: 0.012,
       transparent: true,
       opacity: 0,

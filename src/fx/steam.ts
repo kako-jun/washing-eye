@@ -33,7 +33,7 @@ export class Steam {
       transparent: true,
       depthWrite: false,
       uniforms: {
-        uColor: { value: new THREE.Color(0xdcecf2) },
+        uColor: { value: new THREE.Color(0xffffff) },
         uScale: { value: 1 },
         uIntensity: { value: 0.5 },
       },

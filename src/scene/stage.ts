@@ -13,9 +13,17 @@ export interface Stage {
 /** 描画解像度の倍率の上限 */
 export const MAX_PIXEL_RATIO = 2;
 
-export const BACKGROUND = new THREE.Color(0x0d1820);
+/** 背景とフォグの色。明るい浴室の、湯気でかすんだ白 */
+export const BACKGROUND = new THREE.Color(0xdde7ea);
 /** 一人称の目の位置（腰掛けた状態の頭の中） */
 export const EYE_POSITION = new THREE.Vector3(0, 0.8, -0.03);
+
+/** 正面の壁の鏡の位置と大きさ（鏡は +Z を向く。目の高さで、少し見上げると自分が映る） */
+export const MIRROR_PLACEMENT = {
+  center: new THREE.Vector3(0, 0.95, -1.145),
+  width: 0.8,
+  height: 0.62,
+};
 
 /** 浴室の床・壁・腰掛けと、柔らかいライト一式を組む */
 export function createStage(canvas: HTMLCanvasElement): Stage {
@@ -28,24 +36,24 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
 
   const scene = new THREE.Scene();
   scene.background = BACKGROUND;
-  scene.fog = new THREE.Fog(BACKGROUND, 1.6, 5.5);
+  scene.fog = new THREE.Fog(BACKGROUND, 2.2, 7.5);
 
   const camera = new THREE.PerspectiveCamera(70, 1, 0.03, 30);
   camera.position.copy(EYE_POSITION);
 
-  // ライト: 上からの柔らかいキーライト + 青みの環境光 + 暖色の補助
-  scene.add(new THREE.HemisphereLight(0x9cc7d9, 0x1a2228, 0.9));
-  const key = new THREE.DirectionalLight(0xfff4e6, 1.6);
-  key.position.set(0.6, 2.4, -1.2);
+  // ライト: 明るく柔らかい環境光 + 窓から差すような暖かい主光 + 暖色の補助
+  scene.add(new THREE.HemisphereLight(0xf4fbff, 0xb7c7cd, 1.15));
+  const key = new THREE.DirectionalLight(0xffe1b8, 1.7);
+  key.position.set(-1.6, 2.2, -0.2);
   scene.add(key);
-  const warm = new THREE.PointLight(0xffc89a, 0.8, 4, 1.5);
-  warm.position.set(-0.8, 1.4, 0.4);
+  const warm = new THREE.PointLight(0xffd2a8, 0.5, 4, 1.5);
+  warm.position.set(0.8, 1.4, 0.4);
   scene.add(warm);
 
   // 床
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(8, 8),
-    createToonMaterial({ color: 0x1f3440, rimStrength: 0 }),
+    createToonMaterial({ color: 0xc6d5da, rimStrength: 0 }),
   );
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -0.42;
@@ -55,7 +63,7 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
   const wall = new THREE.Mesh(
     new THREE.PlaneGeometry(6, 4),
     new THREE.MeshToonMaterial({
-      color: 0x2b4a57,
+      color: 0xeef3f4,
       map: createTileTexture(),
       gradientMap: getGradientMap(),
     }),
@@ -78,7 +86,7 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
   // 腰掛け
   const stool = new THREE.Mesh(
     new THREE.CylinderGeometry(0.2, 0.17, 0.4, 28),
-    createToonMaterial({ color: 0x5f8f9c, rimStrength: 0.2 }),
+    createToonMaterial({ color: 0x8fc3cf, rimStrength: 0.2 }),
   );
   stool.position.set(0, -0.22, 0.02);
   scene.add(stool);
@@ -128,7 +136,7 @@ function createTileTexture(): THREE.CanvasTexture {
   const g = c.getContext('2d')!;
   g.fillStyle = '#ffffff';
   g.fillRect(0, 0, size, size);
-  g.strokeStyle = '#b9c7cc';
+  g.strokeStyle = '#c3cfd3';
   g.lineWidth = 6;
   g.strokeRect(0, 0, size, size);
   const tex = new THREE.CanvasTexture(c);
