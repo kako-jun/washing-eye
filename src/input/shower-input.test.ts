@@ -8,11 +8,11 @@ let onChange: Mock<(on: boolean) => void>;
 let input: ShowerInput;
 let visibility: DocumentVisibilityState;
 
-function press(type: string, pointerId = 1) {
+function press(type: string, pointerId = 1, mouseButton = 0) {
   const e =
     typeof PointerEvent !== 'undefined'
-      ? new PointerEvent(type, { pointerId, bubbles: true, cancelable: true })
-      : Object.defineProperty(new MouseEvent(type, { bubbles: true, cancelable: true }), 'pointerId', {
+      ? new PointerEvent(type, { pointerId, button: mouseButton, bubbles: true, cancelable: true })
+      : Object.defineProperty(new MouseEvent(type, { button: mouseButton, bubbles: true, cancelable: true }), 'pointerId', {
           value: pointerId,
         });
   button.dispatchEvent(e);
@@ -103,6 +103,14 @@ describe('シャワー入力', () => {
     expect(input.on).toBe(true);
     press('pointerup', 1);
     expect(input.on).toBe(false);
+  });
+
+  it('右ボタン・中ボタンで押してもシャワーは出ず、キャプチャもしない', () => {
+    press('pointerdown', 1, 2);
+    press('pointerdown', 2, 1);
+    expect(input.on).toBe(false);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(button.setPointerCapture).not.toHaveBeenCalled();
   });
 
   it('押していない pointerId の up は無視する', () => {

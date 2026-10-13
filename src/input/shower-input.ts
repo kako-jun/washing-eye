@@ -1,6 +1,6 @@
 /**
  * シャワーの ON/OFF 入力。
- * - シャワーボタンの長押し（ポインターごと）と Space キーを、入力元ごとに押下状態として持つ
+ * - シャワーボタンの長押し（主ボタンのポインターごと）と Space キーを、入力元ごとに押下状態として持つ
  * - いずれかの入力元が押されていれば ON。全部離れたら OFF
  * - ウィンドウのフォーカスが外れた・タブが隠れたら、全入力元を解除して OFF
  * - 開始前（スタート画面表示中）は受け付けない
@@ -86,7 +86,8 @@ export function createShowerInput(opts: ShowerInputOptions): ShowerInput {
   const onPointerDown = (e: Event) => {
     const pe = e as PointerEvent;
     pe.preventDefault();
-    if (!isStarted()) return;
+    // シャワーは主ボタン（左クリック・タッチ・ペン）だけで出す
+    if (pe.button !== 0 || !isStarted()) return;
     try {
       button.setPointerCapture(pe.pointerId);
     } catch {
