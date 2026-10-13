@@ -1,7 +1,10 @@
 import { ICON_MARK, ICON_PLAY } from './icons';
 
-/** 開始処理（iOS の傾き許可要求など）を待つ上限。返ってこないときは押し直せる状態に戻す */
-export const START_TIMEOUT_MS = 8000;
+/**
+ * 開始処理（iOS の傾き許可要求など）を待つ上限。返ってこないときは押し直せる状態に戻す。
+ * 許可ダイアログを読んで答える間にエラー文言が出ないよう、長めにとる。
+ */
+export const START_TIMEOUT_MS = 30000;
 
 /** フェードの終わりを待つ余裕。これを過ぎたら transitionend が来なくても取り除く */
 const REMOVE_GRACE_MS = 100;
@@ -28,7 +31,11 @@ function longestTransitionMs(el: Element): number {
 /**
  * スタート画面。「はじめる」の 1 タップで、音の開始と iOS の傾き許可要求をまとめて行う。
  */
-export function showStartScreen(root: HTMLElement, touch: boolean, onStart: () => Promise<void>): void {
+export function showStartScreen(
+  root: HTMLElement,
+  touch: boolean,
+  onStart: () => Promise<void> | void,
+): void {
   const el = document.createElement('section');
   el.className = 'start';
   el.innerHTML = `
@@ -52,7 +59,6 @@ export function showStartScreen(root: HTMLElement, touch: boolean, onStart: () =
   // 開始処理の最中・開始後は押しても何もしない（二重クリックで onStart を複数回走らせない）
   let busy = false;
   let closed = false;
-  let attempt = 0;
 
   const close = () => {
     if (closed) return;
@@ -89,33 +95,39 @@ export function showStartScreen(root: HTMLElement, touch: boolean, onStart: () =
   const handleClick = () => {
     if (busy || closed) return;
     busy = true;
-    const id = ++attempt;
     button.disabled = true;
     error.hidden = true;
     let settled = false;
     const timer = setTimeout(() => {
-      if (settled || closed || id !== attempt) return;
+      // 古い試行が遅れて成功し、もう閉じているときは戻さない
+      if (settled || closed) return;
       settled = true;
       recover();
     }, START_TIMEOUT_MS);
-    Promise.resolve()
-      .then(onStart)
-      .then(
-        () => {
-          clearTimeout(timer);
-          settled = true;
-          // 時間切れの後に遅れて成功した場合も、開始は済んでいるので画面を閉じる（閉じるのは 1 回だけ）
-          close();
-        },
-        () => {
-          clearTimeout(timer);
-          if (settled) return;
-          settled = true;
-          // 押し直し後の古い試行の失敗は、今の試行の状態を壊さないよう無視する
-          if (closed || id !== attempt) return;
-          recover();
-        },
-      );
+    // iOS の許可要求はクリックの同期区間の中で呼ぶ必要があるので、onStart はこの場で同期的に呼ぶ
+    let pending: Promise<void>;
+    try {
+      pending = Promise.resolve(onStart());
+    } catch (err) {
+      pending = Promise.reject(err);
+    }
+    pending.then(
+      () => {
+        clearTimeout(timer);
+        settled = true;
+        // 時間切れの後に遅れて成功した場合も、開始は済んでいるので画面を閉じる（閉じるのは 1 回だけ）
+        close();
+      },
+      () => {
+        clearTimeout(timer);
+        // 時間切れ済みの古い試行の失敗は、押し直した今の試行の状態を壊さないよう無視する
+        if (settled) return;
+        settled = true;
+        // 古い試行が遅れて成功し、もう閉じているときは戻さない
+        if (closed) return;
+        recover();
+      },
+    );
   };
   button.addEventListener('click', handleClick);
 }

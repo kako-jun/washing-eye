@@ -197,3 +197,56 @@ describe('スタート画面を取り除く', () => {
     }
   });
 });
+
+describe('スタート画面の開始処理の呼び方', () => {
+  it('待ち時間の上限は 30 秒（許可ダイアログに答える間にエラー文言を出さない）', () => {
+    expect(START_TIMEOUT_MS).toBe(30000);
+  });
+
+  it('開始処理はクリックの中で同期的に呼ぶ（iOS の許可要求をユーザー操作の同期区間に収める）', () => {
+    const onStart = vi.fn(() => new Promise<void>(() => {}));
+    showStartScreen(root, false, onStart);
+    click();
+    expect(onStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('時間切れの古い試行が後から失敗しても、押し直した今の試行は待ちのまま（ボタン無効・エラー非表示）', async () => {
+    vi.useFakeTimers();
+    const first = deferred();
+    const second = deferred();
+    const onStart = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    showStartScreen(root, false, onStart);
+    click();
+    await vi.advanceTimersByTimeAsync(START_TIMEOUT_MS);
+    click(); // 押し直し
+    expect(button().disabled).toBe(true);
+    expect(error().hidden).toBe(true);
+    first.reject(new Error('late'));
+    await flush();
+    expect(button().disabled).toBe(true);
+    expect(error().hidden).toBe(true);
+    expect(isLeaving()).toBe(false);
+    // 今の試行が成功すれば普通に閉じる
+    second.resolve();
+    await flush();
+    expect(isLeaving()).toBe(true);
+  });
+
+  it('古い試行が遅れて成功して閉じた後は、今の試行が失敗・時間切れになってもボタンを戻さない', async () => {
+    vi.useFakeTimers();
+    const first = deferred();
+    const second = deferred();
+    const onStart = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    showStartScreen(root, false, onStart);
+    click();
+    await vi.advanceTimersByTimeAsync(START_TIMEOUT_MS);
+    click();
+    first.resolve();
+    await flush();
+    expect(isLeaving()).toBe(true);
+    second.reject(new Error('x'));
+    await flush();
+    expect(button().disabled).toBe(true);
+    expect(error().hidden).toBe(true);
+  });
+});
