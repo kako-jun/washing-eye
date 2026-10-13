@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import './ui/style.css';
-import { createStage, watchPixelRatio } from './scene/stage';
+import { MIRROR_PLACEMENT, createStage, watchPixelRatio } from './scene/stage';
+import { MIRROR_LAYER, Mirror } from './scene/mirror';
+import { createMirrorHead } from './body/head';
 import { createBody } from './body/createBody';
 import { DEFAULT_BODY } from './body/params';
 import { Foam } from './foam/foam';
@@ -8,7 +10,7 @@ import { LookController } from './input/look';
 import { PointerInput, type SurfaceHit } from './input/pointer';
 import { Sponge } from './input/sponge';
 import { AimMarker } from './fx/aim-marker';
-import { HandShowerAim, rinseTargets, waterLevel, waterSources } from './fx/water';
+import { HandShowerAim, mirrorTargets, rinseTargets, waterLevel, waterSources } from './fx/water';
 import { createToolBridge, createToolControl } from './tool-control';
 import { Steam } from './fx/steam';
 import { Shower } from './fx/shower';
@@ -28,6 +30,17 @@ const { scene, camera, renderer } = stage;
 // 体（BodyParams を差し替えれば別の体になる）
 const body = createBody(DEFAULT_BODY);
 scene.add(body.group);
+// 鏡にだけ映る抽象的な頭（一人称カメラには映らない）
+scene.add(createMirrorHead(DEFAULT_BODY, MIRROR_LAYER));
+
+// 正面の壁の鏡。スマホでは反射を小さく描き、描き直しを 1 フレームおきに間引く
+const mirror = new Mirror({
+  ...MIRROR_PLACEMENT,
+  textureSize: isTouch ? 384 : 512,
+  updateEvery: isTouch ? 2 : 1,
+  multisample: isTouch ? 0 : 4,
+});
+scene.add(mirror.group);
 
 // スマホでは泡の上限を下げて軽く保つ
 const foam = new Foam(isTouch ? 600 : 1000);
@@ -64,7 +77,8 @@ const bitangent = new THREE.Vector3();
 // 道具の配線より先に作る HUD・ポインターは、この接続口から道具を読む・持ち替える
 const toolBridge = createToolBridge();
 
-const pointer = new PointerInput(canvas, camera, body.surfaces, look, {
+// 当たり判定の対象は体と鏡（スポンジは体だけ、シャワーは体と鏡に当たる）
+const pointer = new PointerInput(canvas, camera, [...body.surfaces, mirror.surface], look, {
   onScrub(hit: SurfaceHit, speed: number) {
     scrubSpeed = Math.max(scrubSpeed, speed);
     // 当たり位置の周りに少し散らして泡を置く（体表に当て直して浮かないようにする）
@@ -145,11 +159,13 @@ window.addEventListener('resize', onResize);
 watchPixelRatio(window, onResize);
 onResize();
 
-// 固定シャワーの狙い: 視線の中心のレイが体に当たる点。外れたら前方 1m
+// 固定シャワーの狙い: 視線の中心のレイが体・鏡に当たる点。外れたら前方 1m
 const center = new THREE.Vector2(0, 0);
 const aimRay = new THREE.Raycaster();
 const aimPoint = new THREE.Vector3();
 const RINSE_RADIUS = 0.13;
+/** 水が鏡に当たったとき、曇りが取れる半径（m） */
+const MIRROR_CLEAR_RADIUS = 0.11;
 const handHead = new THREE.Vector3();
 
 let lastTime = -1;
@@ -176,19 +192,23 @@ renderer.setAnimationLoop((time: number) => {
   // 手持ちシャワー: ヘッドは当て先から体の外側・手前に少し離した位置
   handShower.setHead(handAim.headFrom(camera.position, handHead));
   handShower.aim(handAim.point);
-  handShower.update(dt, handAim.onBody ? handAim.normal : null);
+  handShower.update(dt, handAim.surface ? handAim.normal : null);
   aimMarker.update(dt);
 
-  // 泡は水の落ちる点を中心に流す（固定: 視線の中心、手持ち: 当て先）。水音・湯気は強い方に合わせる
+  // 泡は体に落ちる水の点を中心に流し、鏡に落ちる水はその点の曇りを取る（固定: 視線の中心、手持ち: 当て先）。
+  // 水音・湯気は強い方に合わせる
   const water = waterSources(
     { flow: shower.flowLevel, hit: aimHit },
     { flow: handShower.flowLevel, aim: handAim },
   );
   for (const r of rinseTargets(water)) foam.rinse(r.point, RINSE_RADIUS, 2.6 * r.flow, dt);
+  for (const m of mirrorTargets(water)) mirror.clearAt(m.point, MIRROR_CLEAR_RADIUS, m.flow, dt);
   foam.update(dt);
+  mirror.update(dt);
   const flow = waterLevel(water);
 
   sponge.update(dt, elapsed);
+  steam.setFlow(flow);
   steam.setIntensity(0.45 + flow * 0.25);
   steam.update(dt);
 
