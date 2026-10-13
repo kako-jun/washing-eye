@@ -121,6 +121,52 @@ describe('LookController ドラッグ', () => {
   });
 });
 
+describe('LookController ドラッグの異常値', () => {
+  const finiteAfterUpdate = (look: LookController) => {
+    const cam = new THREE.PerspectiveCamera();
+    look.update(cam, 0.016);
+    return Number.isFinite(cam.rotation.x) && Number.isFinite(cam.rotation.y);
+  };
+
+  for (const [label, h] of [
+    ['負', -300],
+    ['NaN', Number.NaN],
+    ['Infinity', Number.POSITIVE_INFINITY],
+    ['-Infinity', Number.NEGATIVE_INFINITY],
+  ] as const) {
+    it(`画面の高さが ${label} のドラッグでは視線が動かず、NaN にもならない`, () => {
+      const look = new LookController();
+      const before = targets(look);
+      look.drag(30, 30, h);
+      expect(targets(look)).toEqual(before);
+      expect(finiteAfterUpdate(look)).toBe(true);
+    });
+  }
+
+  for (const [label, dx, dy] of [
+    ['dx が NaN', Number.NaN, 0],
+    ['dy が NaN', 0, Number.NaN],
+    ['dx が Infinity', Number.POSITIVE_INFINITY, 0],
+    ['dy が -Infinity', 0, Number.NEGATIVE_INFINITY],
+  ] as const) {
+    it(`${label} のドラッグでは視線が動かず、NaN にもならない`, () => {
+      const look = new LookController();
+      const before = targets(look);
+      look.drag(dx, dy, 300);
+      expect(targets(look)).toEqual(before);
+      expect(finiteAfterUpdate(look)).toBe(true);
+    });
+  }
+
+  it('異常値のドラッグの後も、正常なドラッグは普通に効く', () => {
+    const look = new LookController();
+    look.drag(Number.NaN, 0, 300);
+    look.drag(10, 0, 0);
+    look.drag(10, 0, 300);
+    expect(targets(look).yaw).toBeCloseTo((10 * 1.6) / 300, 9);
+  });
+});
+
 describe('LookController.enableTilt', () => {
   it('DeviceOrientationEvent が無い環境では false を返す', async () => {
     vi.stubGlobal('DeviceOrientationEvent', undefined);
