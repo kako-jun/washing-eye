@@ -100,7 +100,7 @@ const pointer = new PointerInput(canvas, camera, body.surfaces, look, {
   onSpray(on) {
     handShower.setOn(on);
   },
-});
+}, () => tools.current);
 
 const hud = createHud(uiRoot, {
   showFps,
@@ -114,8 +114,8 @@ setMode(isTouch ? 'touch' : 'mouse');
 let started = false;
 
 // 手に持つ道具（スポンジ／手持ちシャワー）。持ち替えたら、もう一方の動作は止める
-const tools = createToolState((tool) => {
-  pointer.setTool(tool); // こすり・手持ちの水流を止め、前の道具の目印を消す
+const tools = createToolState((tool, prev) => {
+  pointer.toolChanged(prev); // こすり・手持ちの水流を止め、前の道具の目印を消す
   hud.setTool(tool);
   // 手持ちシャワーの間は固定シャワーを使えない（二重に流さない）
   if (tool === 'handShower') showerInput.releaseAll();

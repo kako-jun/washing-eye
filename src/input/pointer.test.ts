@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { LookController } from './look';
 import { PointerInput, type SurfaceHit } from './pointer';
+import { createToolState, type ToolState } from './tool';
 
 /**
  * 画面 100x100px、正射影カメラで 1px = ワールド 0.02。
@@ -19,6 +20,8 @@ let plane: THREE.Mesh;
 let look: { usingTilt: boolean; drag: Mock };
 let cb: { onScrub: Mock; onScrubEnd: Mock; onHover: Mock; onAim: Mock; onSpray: Mock };
 let input: PointerInput;
+/** 道具の正本（main と同じく、持ち替えたら PointerInput.toolChanged を呼ぶ） */
+let tools: ToolState;
 let capture: Mock;
 
 function pointer(
@@ -69,7 +72,8 @@ function setup(opts: { tilt?: boolean } = {}) {
 
   look = { usingTilt: opts.tilt ?? false, drag: vi.fn() };
   cb = { onScrub: vi.fn(), onScrubEnd: vi.fn(), onHover: vi.fn(), onAim: vi.fn(), onSpray: vi.fn() };
-  input = new PointerInput(el, camera, [plane], look as unknown as LookController, cb);
+  tools = createToolState((_tool, prev) => input.toolChanged(prev));
+  input = new PointerInput(el, camera, [plane], look as unknown as LookController, cb, () => tools.current);
 }
 
 const mode = () => (input as any).mode as string;
@@ -403,12 +407,14 @@ describe('PointerInput のキャプチャ失敗と後始末', () => {
 });
 
 describe('PointerInput 手持ちシャワー', () => {
-  const hand = () => input.setTool('handShower');
+  const hand = () => tools.set('handShower');
   /** 最後に onAim に渡された当て先 */
   const lastAim = () => cb.onAim.mock.calls.at(-1) as [SurfaceHit | null, boolean];
 
-  it('既定の道具はスポンジ', () => {
-    expect(input.currentTool).toBe('sponge');
+  it('既定の道具はスポンジで、体の上を押すとこする', () => {
+    expect(tools.current).toBe('sponge');
+    fire('pointerdown', { id: 1, x: ON, y: ON });
+    expect(mode()).toBe('scrub');
   });
 
   it('マウスで体の上を動かすと、押していなくても当て先が追従する（水は出ない）', () => {
@@ -513,7 +519,7 @@ describe('PointerInput 道具の持ち替え', () => {
   it('こすっている途中で手持ちシャワーに持ち替えると、こすりを止めてスポンジを消す', () => {
     fire('pointerdown', { id: 1, x: ON, y: ON });
     expect(mode()).toBe('scrub');
-    input.setTool('handShower');
+    tools.set('handShower');
     expect(cb.onScrubEnd).toHaveBeenCalledTimes(1);
     expect(cb.onHover).toHaveBeenLastCalledWith(null, false);
     expect(mode()).toBe('idle');
@@ -526,9 +532,9 @@ describe('PointerInput 道具の持ち替え', () => {
   });
 
   it('水を出している途中でスポンジに持ち替えると、水を止めて当て先を消す', () => {
-    input.setTool('handShower');
+    tools.set('handShower');
     fire('pointerdown', { id: 1, x: ON, y: ON });
-    input.setTool('sponge');
+    tools.set('sponge');
     expect(cb.onSpray).toHaveBeenLastCalledWith(false);
     expect(cb.onAim).toHaveBeenLastCalledWith(null, false);
     expect(mode()).toBe('idle');
@@ -539,7 +545,7 @@ describe('PointerInput 道具の持ち替え', () => {
 
   it('見回している途中で持ち替えても、見回しは続く', () => {
     fire('pointerdown', { id: 1, x: OFF, y: OFF });
-    input.setTool('handShower');
+    tools.set('handShower');
     expect(mode()).toBe('look');
     fire('pointermove', { id: 1, x: OFF + 5, y: OFF });
     expect(look.drag).toHaveBeenCalled();
@@ -547,22 +553,52 @@ describe('PointerInput 道具の持ち替え', () => {
 
   it('同じ道具を選び直しても何も起きない', () => {
     fire('pointerdown', { id: 1, x: ON, y: ON });
-    input.setTool('sponge');
+    tools.set('sponge');
     expect(mode()).toBe('scrub');
     expect(cb.onScrubEnd).not.toHaveBeenCalled();
   });
 
   it('cancel で進行中の操作を止め、目印を消す（フォーカスが外れたときなど）', () => {
-    input.setTool('handShower');
+    tools.set('handShower');
     fire('pointerdown', { id: 1, x: ON, y: ON });
     input.cancel();
     expect(cb.onSpray).toHaveBeenLastCalledWith(false);
     expect(cb.onAim).toHaveBeenLastCalledWith(null, false);
     expect(mode()).toBe('idle');
-    input.setTool('sponge');
+    tools.set('sponge');
     fire('pointerdown', { id: 2, x: ON, y: ON });
     input.cancel();
     expect(cb.onScrubEnd).toHaveBeenCalledTimes(1);
     expect(mode()).toBe('idle');
+  });
+});
+
+describe('PointerInput 持ち替え直後の目印', () => {
+  it('マウスが体の上で止まったままキーで持ち替えても、新しい道具の目印がその場に出る', () => {
+    fire('pointermove', { x: 45, y: ON, pointerType: 'mouse' });
+    tools.set('handShower');
+    const [hit, spraying] = cb.onAim.mock.calls.at(-1)!;
+    expect(hit!.point.x).toBeCloseTo(worldX(45), 6);
+    expect(spraying).toBe(false);
+    expect(cb.onHover).toHaveBeenLastCalledWith(null, false); // スポンジは消える
+    tools.set('sponge');
+    const [sHit, pressing] = cb.onHover.mock.calls.at(-1)!;
+    expect(sHit!.point.x).toBeCloseTo(worldX(45), 6);
+    expect(pressing).toBe(false);
+    expect(cb.onAim).toHaveBeenLastCalledWith(null, false);
+  });
+
+  it('マウスが画面の外に出たあとの持ち替えでは、目印を出さない', () => {
+    fire('pointermove', { x: 45, y: ON, pointerType: 'mouse' });
+    fire('pointerleave', { x: 45, y: ON, pointerType: 'mouse' });
+    tools.set('handShower');
+    expect(cb.onAim).not.toHaveBeenCalled();
+  });
+
+  it('タッチの指が離れた後の持ち替えでは、目印を出さない（ホバーが無いので）', () => {
+    fire('pointerdown', { id: 1, x: ON, y: ON });
+    fire('pointerup', { id: 1 });
+    tools.set('handShower');
+    expect(cb.onAim).not.toHaveBeenCalled();
   });
 });

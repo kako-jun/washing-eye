@@ -33,8 +33,9 @@ type Mode = 'idle' | 'scrub' | 'spray' | 'look';
  */
 export class PointerInput {
   private mode: Mode = 'idle';
-  private tool: Tool = 'sponge';
   private pointerId = -1;
+  /** マウスが画面の上にあるときの最後の位置（持ち替え直後に目印を出し直すため）。外に出たら null */
+  private mouseAt: { x: number; y: number } | null = null;
   private lastX = 0;
   private lastY = 0;
   private lastHit: THREE.Vector3 | null = null;
@@ -49,6 +50,8 @@ export class PointerInput {
     private readonly surfaces: THREE.Object3D[],
     private readonly look: LookController,
     private readonly cb: PointerCallbacks,
+    /** 持っている道具（正本は ToolState。ここでは読むだけ） */
+    private readonly getTool: () => Tool,
   ) {
     el.addEventListener('pointerdown', this.down);
     el.addEventListener('pointermove', this.move);
@@ -71,20 +74,15 @@ export class PointerInput {
     this.el.removeEventListener('contextmenu', this.preventContextMenu);
   }
 
-  /** 持っている道具 */
-  get currentTool(): Tool {
-    return this.tool;
-  }
-
   /**
-   * 道具を持ち替える。こすっている・水を出している途中なら、その動作を止める（視線操作は続ける）。
-   * 前の道具の目印（スポンジ・当て先）も消す。
+   * 道具が持ち替えられたあとに呼ぶ（prev は前の道具）。こすっている・水を出している途中なら、その動作を止める
+   * （視線操作は続ける）。前の道具の目印を消し、マウスが体の上にあれば新しい道具の目印をその場に出す。
    */
-  setTool(tool: Tool): void {
-    if (tool === this.tool) return;
+  toolChanged(prev: Tool): void {
+    if (prev === this.getTool()) return;
     if (this.mode === 'scrub' || this.mode === 'spray') this.stop();
-    this.clearHover();
-    this.tool = tool;
+    this.clearHover(prev);
+    if (this.mode === 'idle' && this.mouseAt) this.hover(this.mouseAt.x, this.mouseAt.y);
   }
 
   /** 進行中の操作をやめ、目印も消す（ウィンドウのフォーカスが外れた・タブが隠れたとき） */
@@ -125,7 +123,7 @@ export class PointerInput {
   private down = (e: PointerEvent) => {
     if (this.mode !== 'idle') return;
     const hit = e.button === 0 ? this.hitAt(e.clientX, e.clientY) : null;
-    if (hit && this.tool === 'handShower') {
+    if (hit && this.getTool() === 'handShower') {
       this.mode = 'spray';
       this.cb.onAim?.(hit, true);
       this.cb.onSpray?.(true);
@@ -152,13 +150,9 @@ export class PointerInput {
   };
 
   private move = (e: PointerEvent) => {
+    if (e.pointerType === 'mouse') this.mouseAt = { x: e.clientX, y: e.clientY };
     if (this.mode === 'idle') {
-      if (e.pointerType === 'mouse') {
-        const hit = this.hitAt(e.clientX, e.clientY);
-        if (this.tool === 'handShower') this.cb.onAim?.(hit, false);
-        else this.cb.onHover(hit, false);
-        this.el.classList.toggle('is-over-body', !!hit);
-      }
+      if (e.pointerType === 'mouse') this.hover(e.clientX, e.clientY);
       return;
     }
     if (e.pointerId !== this.pointerId) return;
@@ -218,6 +212,14 @@ export class PointerInput {
     if (e.pointerType !== 'mouse') this.clearHover();
   };
 
+  /** 待機中のマウスの位置に、今の道具の目印を出す */
+  private hover(x: number, y: number): void {
+    const hit = this.hitAt(x, y);
+    if (this.getTool() === 'handShower') this.cb.onAim?.(hit, false);
+    else this.cb.onHover(hit, false);
+    this.el.classList.toggle('is-over-body', !!hit);
+  }
+
   /** 進行中の操作（こする・水を出す・見回す）を終えて待機に戻す */
   private stop(): void {
     if (this.mode === 'scrub') this.cb.onScrubEnd();
@@ -235,15 +237,16 @@ export class PointerInput {
     }
   }
 
-  /** 今の道具の目印（スポンジ・当て先）を消す */
-  private clearHover(): void {
-    if (this.tool === 'handShower') this.cb.onAim?.(null, false);
+  /** 道具（既定は今の道具）の目印（スポンジ・当て先）を消す */
+  private clearHover(tool: Tool = this.getTool()): void {
+    if (tool === 'handShower') this.cb.onAim?.(null, false);
     else this.cb.onHover(null, false);
   }
 
   private preventContextMenu = (e: Event) => e.preventDefault();
 
   private leave = (e: PointerEvent) => {
+    if (e.pointerType === 'mouse') this.mouseAt = null;
     if (this.mode === 'idle' && e.pointerType === 'mouse') {
       this.clearHover();
       this.el.classList.remove('is-over-body');
