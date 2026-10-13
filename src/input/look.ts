@@ -31,6 +31,9 @@ export class LookController {
 
   /** ドラッグ量（ピクセル）で視線を回す */
   drag(dx: number, dy: number, viewportHeight: number): void {
+    // 画面の高さが取れない（0・非有限）ときは動かさない。視線が NaN に汚染されるのを防ぐ
+    if (!(viewportHeight > 0) || !Number.isFinite(viewportHeight)) return;
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
     const k = 1.6 / viewportHeight;
     this.targetYaw = clampYaw(this.targetYaw + dx * k);
     this.targetPitch = THREE.MathUtils.clamp(this.targetPitch + dy * k, PITCH_MIN, PITCH_MAX);
