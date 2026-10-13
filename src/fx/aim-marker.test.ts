@@ -27,7 +27,7 @@ describe('当て先の目印', () => {
     expect(m.mesh.position.z).toBeGreaterThan(0);
   });
 
-  it('水を出している間は、ホバー中より明るい', () => {
+  it('水を出している間は、ホバー中より濃く（不透明に）示す', () => {
     const m = new AimMarker();
     m.setTarget(hit(0), false);
     run(m, 1);
