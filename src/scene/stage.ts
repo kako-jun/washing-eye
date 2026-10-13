@@ -10,6 +10,9 @@ export interface Stage {
   resize(): void;
 }
 
+/** 描画解像度の倍率の上限 */
+export const MAX_PIXEL_RATIO = 2;
+
 export const BACKGROUND = new THREE.Color(0x0d1820);
 /** 一人称の目の位置（腰掛けた状態の頭の中） */
 export const EYE_POSITION = new THREE.Vector3(0, 0.8, -0.03);
@@ -21,7 +24,6 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
     antialias: true,
     powerPreference: 'high-performance',
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const scene = new THREE.Scene();
@@ -84,6 +86,8 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
   const resize = () => {
     const w = window.innerWidth;
     const h = window.innerHeight;
+    // 高密度画面（スマホ等）でも描画が重くなりすぎないよう 2 倍までに抑える。拡大率の変化にも追従する
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     // 縦長画面では水平方向の視野が狭くなりすぎないよう広げる
