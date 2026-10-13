@@ -46,6 +46,7 @@ export class FogMask {
   /**
    * uv の点を中心に曇りを取る。radius は鏡の幅を 1 とした半径。
    * 中心から半径の半分までは amount だけ取り、そこから縁へなめらかに弱める。
+   * 当て続けても縁の曇りは中心からの距離に応じた下限までしか取れない（縁はやわらかいまま）。
    * 戻り値は曇りが変わったか。
    */
   clear(u: number, v: number, radius: number, amount: number): boolean {
@@ -61,7 +62,11 @@ export class FogMask {
         if (dist >= radius) continue;
         const w = 1 - smoothstep(inner, radius, dist);
         const k = j * this.cols + i;
-        const next = Math.max(0, this.density[k] - amount * w);
+        // 縁は 1 - w より薄くしない（当て続けても縁まで晴れきって硬い境目にならないよう、やわらかい縁を残す）。
+        // すでにそれより晴れている所（前に当てた中心など）は濃くしない
+        const floor = 1 - w;
+        const cur = this.density[k];
+        const next = Math.min(cur, Math.max(cur - amount * w, floor));
         if (next !== this.density[k]) {
           this.density[k] = next;
           changed = true;

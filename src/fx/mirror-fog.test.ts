@@ -26,6 +26,30 @@ describe('鏡の曇りマスク', () => {
     expect(fog.sample(0.5, 0.5)).toBe(0);
   });
 
+  it('当て続けても縁の格子は 0 にならず、中心から縁へなめらかに曇りが戻る（縁の段差が出ない）', () => {
+    const fog = new FogMask(80, 80, 1);
+    for (let i = 0; i < 200; i++) fog.clear(0.5, 0.5, 0.2, 0.2);
+    // 中心から右へ半径の外までたどる
+    const profile: number[] = [];
+    for (let i = 40; i < 64; i++) profile.push(fog.at(i, 40));
+    expect(profile[0]).toBe(0);
+    // 半径の 8 割の所（縁）は晴れきらない
+    expect(fog.sample(0.5 + 0.16, 0.5)).toBeGreaterThan(0.3);
+    expect(fog.sample(0.5 + 0.16, 0.5)).toBeLessThan(1);
+    // 外へ向かって曇りは減らず、隣どうしの差は小さい（硬い境目がない）
+    for (let k = 1; k < profile.length; k++) {
+      expect(profile[k]).toBeGreaterThanOrEqual(profile[k - 1]);
+      expect(profile[k] - profile[k - 1]).toBeLessThan(0.2);
+    }
+  });
+
+  it('縁の下限は、すでに晴れている所を曇らせはしない', () => {
+    const fog = new FogMask(40, 40, 1);
+    fog.clear(0.5, 0.5, 0.2, 1); // 中心を晴らす
+    fog.clear(0.5 + 0.16, 0.5, 0.2, 1); // 隣に当てる: 前の中心はこの当たりの縁にあたる
+    expect(fog.sample(0.5, 0.5)).toBe(0);
+  });
+
   it('縦横比を考えて、当たった範囲は鏡の上で円になる', () => {
     // 幅 2・高さ 1 の鏡（aspect 0.5）で半径 0.1（幅基準）: 横は uv で 0.1、縦は uv で 0.2 まで届く
     const fog = new FogMask(80, 40, 0.5);
