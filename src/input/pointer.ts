@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { LookController } from './look';
+import type { Tool } from './tool';
 
 export interface SurfaceHit {
   point: THREE.Vector3;
@@ -13,17 +14,26 @@ export interface PointerCallbacks {
   onScrubEnd(): void;
   /** ホバー（スポンジの表示位置）。体に当たらなければ null */
   onHover(hit: SurfaceHit | null, scrubbing: boolean): void;
+  /**
+   * 手持ちシャワーの当て先（目印の位置）。ホバー中と、押して水を出している間に呼ばれる。
+   * 体に当たらなければ null（水を出している間は、外れても水は止めない）
+   */
+  onAim?(hit: SurfaceHit | null, spraying: boolean): void;
+  /** 手持ちシャワーの水を出す・止める */
+  onSpray?(on: boolean): void;
 }
 
-type Mode = 'idle' | 'scrub' | 'look';
+type Mode = 'idle' | 'scrub' | 'spray' | 'look';
 
 /**
- * 画面のポインター操作。
- * - 体の上で押す → スポンジでこする
- * - 体の外で押す／右・中ボタン → 視線を回す（傾きモード中は視線は傾きに任せる）
+ * 画面のポインター操作。持っている道具で、体の上を押したときの動きが変わる。
+ * - スポンジ: 体の上で押す → こする
+ * - 手持ちシャワー: 体の上で押す → 押している間、ポインターの指す点に水を当てる（マウスはホバーでも当て先を示す）
+ * - どちらでも: 体の外で押す／右・中ボタン → 視線を回す（傾きモード中は視線は傾きに任せる）
  */
 export class PointerInput {
   private mode: Mode = 'idle';
+  private tool: Tool = 'sponge';
   private pointerId = -1;
   private lastX = 0;
   private lastY = 0;
@@ -61,6 +71,28 @@ export class PointerInput {
     this.el.removeEventListener('contextmenu', this.preventContextMenu);
   }
 
+  /** 持っている道具 */
+  get currentTool(): Tool {
+    return this.tool;
+  }
+
+  /**
+   * 道具を持ち替える。こすっている・水を出している途中なら、その動作を止める（視線操作は続ける）。
+   * 前の道具の目印（スポンジ・当て先）も消す。
+   */
+  setTool(tool: Tool): void {
+    if (tool === this.tool) return;
+    if (this.mode === 'scrub' || this.mode === 'spray') this.stop();
+    this.clearHover();
+    this.tool = tool;
+  }
+
+  /** 進行中の操作をやめ、目印も消す（ウィンドウのフォーカスが外れた・タブが隠れたとき） */
+  cancel(): void {
+    if (this.mode !== 'idle') this.stop();
+    this.clearHover();
+  }
+
   /** 画面座標から体表へのレイキャスト */
   hitAt(clientX: number, clientY: number): SurfaceHit | null {
     const rect = this.el.getBoundingClientRect();
@@ -93,7 +125,11 @@ export class PointerInput {
   private down = (e: PointerEvent) => {
     if (this.mode !== 'idle') return;
     const hit = e.button === 0 ? this.hitAt(e.clientX, e.clientY) : null;
-    if (hit) {
+    if (hit && this.tool === 'handShower') {
+      this.mode = 'spray';
+      this.cb.onAim?.(hit, true);
+      this.cb.onSpray?.(true);
+    } else if (hit) {
       this.mode = 'scrub';
       this.lastHit = hit.point.clone();
       this.lastTime = performance.now();
@@ -119,7 +155,8 @@ export class PointerInput {
     if (this.mode === 'idle') {
       if (e.pointerType === 'mouse') {
         const hit = this.hitAt(e.clientX, e.clientY);
-        this.cb.onHover(hit, false);
+        if (this.tool === 'handShower') this.cb.onAim?.(hit, false);
+        else this.cb.onHover(hit, false);
         this.el.classList.toggle('is-over-body', !!hit);
       }
       return;
@@ -130,12 +167,16 @@ export class PointerInput {
     this.lastX = e.clientX;
     this.lastY = e.clientY;
 
-    // こする処理は update() で毎フレーム行う（傾きで視線が動いても当たり位置が追従する）
+    // こする・当て先の追従は update() で毎フレーム行う（傾きで視線が動いても当たり位置が追従する）
     if (this.mode === 'look') this.look.drag(dx, dy, this.el.clientHeight);
   };
 
-  /** 毎フレーム呼ぶ。こすっている間、ポインター位置の体表に泡を足す */
+  /** 毎フレーム呼ぶ。こすっている間はポインター位置の体表に泡を足し、水を出している間は当て先を追従させる */
   update(): void {
+    if (this.mode === 'spray') {
+      this.cb.onAim?.(this.hitAt(this.lastX, this.lastY), true);
+      return;
+    }
     if (this.mode !== 'scrub') return;
     const hit = this.hitAt(this.lastX, this.lastY);
     this.cb.onHover(hit, true);
@@ -172,19 +213,39 @@ export class PointerInput {
   /** pointerup / pointercancel / lostpointercapture の共通の後始末（同じポインターで 2 回目以降は何もしない） */
   private end = (e: PointerEvent) => {
     if (e.pointerId !== this.pointerId) return;
+    this.stop();
+    // マウスはホバーが続くので目印を残す。タッチ・ペンは指が離れたら消す
+    if (e.pointerType !== 'mouse') this.clearHover();
+  };
+
+  /** 進行中の操作（こする・水を出す・見回す）を終えて待機に戻す */
+  private stop(): void {
     if (this.mode === 'scrub') this.cb.onScrubEnd();
+    if (this.mode === 'spray') this.cb.onSpray?.(false);
+    const id = this.pointerId;
     this.mode = 'idle';
     this.pointerId = -1;
     this.lastHit = null;
     this.el.classList.remove('is-looking');
-    if (e.pointerType !== 'mouse') this.cb.onHover(null, false);
-  };
+    // 自分で終えた場合はキャプチャも外す（後から届く lostpointercapture は pointerId が合わないので無視される）
+    try {
+      if (id !== -1 && this.el.hasPointerCapture?.(id)) this.el.releasePointerCapture(id);
+    } catch {
+      // 外せなくても状態は戻っている
+    }
+  }
+
+  /** 今の道具の目印（スポンジ・当て先）を消す */
+  private clearHover(): void {
+    if (this.tool === 'handShower') this.cb.onAim?.(null, false);
+    else this.cb.onHover(null, false);
+  }
 
   private preventContextMenu = (e: Event) => e.preventDefault();
 
   private leave = (e: PointerEvent) => {
     if (this.mode === 'idle' && e.pointerType === 'mouse') {
-      this.cb.onHover(null, false);
+      this.clearHover();
       this.el.classList.remove('is-over-body');
     }
   };
