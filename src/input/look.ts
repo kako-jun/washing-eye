@@ -3,6 +3,12 @@ import * as THREE from 'three';
 const PITCH_MIN = THREE.MathUtils.degToRad(-82);
 const PITCH_MAX = THREE.MathUtils.degToRad(25);
 const YAW_LIMIT = THREE.MathUtils.degToRad(110);
+/**
+ * 傾きモードで真下近くを向くと、端末姿勢から求めるヨーが不安定になり大きく振れる（ジンバルロック）。
+ * 見下ろす角度がこの範囲に入るとヨーの更新を弱め、終わりでは止める。
+ */
+const YAW_FADE_START = THREE.MathUtils.degToRad(70);
+const YAW_FADE_END = THREE.MathUtils.degToRad(88);
 
 /**
  * 視線の制御。
@@ -93,7 +99,10 @@ export class LookController {
     this.euler.setFromQuaternion(this.q, 'YXZ');
 
     if (this.yawOrigin === null) this.yawOrigin = this.euler.y;
-    this.targetYaw = clampYaw(wrapAngle(this.euler.y - this.yawOrigin));
+    const yaw = wrapAngle(this.euler.y - this.yawOrigin);
+    // 深く見下ろしているほどヨーの更新を弱める（真下付近の振れを視線に出さない）
+    const weight = 1 - THREE.MathUtils.smoothstep(-this.euler.x, YAW_FADE_START, YAW_FADE_END);
+    this.targetYaw = clampYaw(this.targetYaw + weight * wrapAngle(yaw - this.targetYaw));
     this.targetPitch = THREE.MathUtils.clamp(this.euler.x, PITCH_MIN, PITCH_MAX);
 
     if (!this.tiltActive) {

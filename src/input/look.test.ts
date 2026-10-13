@@ -270,6 +270,49 @@ describe('LookController 傾き入力', () => {
   });
 });
 
+describe('LookController 傾き入力 真下付近のヨー', () => {
+  it('ほぼ真下を向いた状態で端末の向き（alpha・gamma）が大きく揺れても、yaw はほとんど動かない', async () => {
+    const look = await tiltLook();
+    tilt(0, 90, 0); // 正面を決める
+    tilt(0, 2, 0); // ほぼ真下を向く
+    const start = targets(look).yaw;
+    for (const [a, g] of [
+      [90, 1],
+      [-90, -1],
+      [180, 2],
+      [45, -2],
+    ]) {
+      tilt(a, 1, g);
+      expect(Math.abs(targets(look).yaw - start)).toBeLessThan(deg(2));
+      expect(Number.isFinite(targets(look).yaw)).toBe(true);
+    }
+  });
+
+  it('普通に見下ろす角度（45°）では、alpha を 30° 回すと yaw も 30° 変わる（減衰しない）', async () => {
+    const look = await tiltLook();
+    tilt(0, 45, 0);
+    tilt(30, 45, 0);
+    expect(targets(look).yaw).toBeCloseTo(deg(30), 6);
+  });
+
+  it('深めに見下ろす角度（約 80°）では、yaw は回した分の途中までしか変わらない', async () => {
+    const look = await tiltLook();
+    tilt(0, 10, 0);
+    tilt(30, 10, 0);
+    const yaw = targets(look).yaw;
+    expect(yaw).toBeGreaterThan(0);
+    expect(yaw).toBeLessThan(deg(30) - deg(1));
+  });
+
+  it('真下から普通の角度に戻ると、また回した分だけ yaw が変わる', async () => {
+    const look = await tiltLook();
+    tilt(0, 90, 0);
+    tilt(120, 1, 0); // 真下で大きく回しても yaw は追わない
+    tilt(30, 90, 0); // 立てた姿勢に戻ると、今の向き（30°）に追いつく
+    expect(targets(look).yaw).toBeCloseTo(deg(30), 6);
+  });
+});
+
 describe('LookController.update', () => {
   it('dt=0 では視線は変わらない', () => {
     const look = new LookController();
