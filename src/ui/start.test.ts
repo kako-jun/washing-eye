@@ -139,3 +139,61 @@ describe('スタート画面', () => {
     expect(isLeaving()).toBe(true);
   });
 });
+
+describe('スタート画面を取り除く', () => {
+  /** 画面の要素から transitionend を投げる（jsdom に TransitionEvent が無い場合に備えて propertyName を足す） */
+  const transitionEnd = (target: Element, propertyName: string) => {
+    const e = new Event('transitionend', { bubbles: true });
+    Object.defineProperty(e, 'propertyName', { value: propertyName });
+    target.dispatchEvent(e);
+  };
+  const attached = () => root.querySelector('.start') !== null;
+
+  async function startAndClose() {
+    showStartScreen(root, false, async () => {});
+    click();
+    await flush();
+    expect(isLeaving()).toBe(true);
+  }
+
+  it('子要素（ボタン等）の transitionend では取り除かない', async () => {
+    await startAndClose();
+    transitionEnd(button(), 'opacity');
+    expect(attached()).toBe(true);
+  });
+
+  it('画面自体の transitionend でも、opacity 以外（visibility 等）では取り除かない', async () => {
+    await startAndClose();
+    transitionEnd(screen(), 'visibility');
+    expect(attached()).toBe(true);
+  });
+
+  it('画面自体の opacity の transitionend で取り除く', async () => {
+    await startAndClose();
+    transitionEnd(screen(), 'opacity');
+    expect(attached()).toBe(false);
+  });
+
+  it('transition が無い（reduced-motion 等で transitionend が来ない）ときも、少し待てば取り除く', async () => {
+    vi.useFakeTimers();
+    await startAndClose();
+    await vi.advanceTimersByTimeAsync(200);
+    expect(attached()).toBe(false);
+  });
+
+  it('transition があるときは、その時間が過ぎるまで取り除かず、transitionend が来なくても過ぎたら取り除く', async () => {
+    vi.useFakeTimers();
+    const style = document.createElement('style');
+    style.textContent = '.start { transition-duration: 0.6s, 600ms; transition-delay: 0s; }';
+    document.head.appendChild(style);
+    try {
+      await startAndClose();
+      await vi.advanceTimersByTimeAsync(600);
+      expect(attached()).toBe(true);
+      await vi.advanceTimersByTimeAsync(200);
+      expect(attached()).toBe(false);
+    } finally {
+      style.remove();
+    }
+  });
+});

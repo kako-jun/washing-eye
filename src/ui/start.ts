@@ -3,6 +3,28 @@ import { ICON_MARK, ICON_PLAY } from './icons';
 /** 開始処理（iOS の傾き許可要求など）を待つ上限。返ってこないときは押し直せる状態に戻す */
 export const START_TIMEOUT_MS = 8000;
 
+/** フェードの終わりを待つ余裕。これを過ぎたら transitionend が来なくても取り除く */
+const REMOVE_GRACE_MS = 100;
+
+/** 要素の transition のうち最も長いもの（ミリ秒）。transition が無ければ 0 */
+function longestTransitionMs(el: Element): number {
+  const style = getComputedStyle(el);
+  const toMs = (list: string) =>
+    list.split(',').map((v) => {
+      const t = v.trim();
+      const n = parseFloat(t);
+      if (!Number.isFinite(n)) return 0;
+      return t.endsWith('ms') ? n : n * 1000;
+    });
+  const durations = toMs(style.transitionDuration);
+  const delays = toMs(style.transitionDelay);
+  let max = 0;
+  durations.forEach((d, i) => {
+    max = Math.max(max, d + (delays[i % delays.length] ?? 0));
+  });
+  return max;
+}
+
 /**
  * スタート画面。「はじめる」の 1 タップで、音の開始と iOS の傾き許可要求をまとめて行う。
  */
@@ -40,7 +62,21 @@ export function showStartScreen(root: HTMLElement, touch: boolean, onStart: () =
     error.hidden = true;
     button.removeEventListener('click', handleClick);
     el.classList.add('is-leaving');
-    el.addEventListener('transitionend', () => el.remove(), { once: true });
+    // フェードの終わりで取り除く。子要素の transitionend（ボタンの hover 等）や visibility の終わりでは閉じない
+    let removed = false;
+    const remove = () => {
+      if (removed) return;
+      removed = true;
+      el.removeEventListener('transitionend', onEnd);
+      clearTimeout(fallback);
+      el.remove();
+    };
+    const onEnd = (e: Event) => {
+      if (e.target === el && (e as TransitionEvent).propertyName === 'opacity') remove();
+    };
+    el.addEventListener('transitionend', onEnd);
+    // transition が無効（reduced-motion）・イベントが届かない場合も、フェード時間を過ぎたら確実に取り除く
+    const fallback = setTimeout(remove, longestTransitionMs(el) + REMOVE_GRACE_MS);
   };
   // 失敗・時間切れのときは押し直せる状態に戻す
   const recover = () => {
