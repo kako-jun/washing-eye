@@ -1,5 +1,5 @@
 import { createShowerInput, type ShowerInput } from './input/shower-input';
-import { bindToolKeys, createToolState, type ToolState } from './input/tool';
+import { DEFAULT_TOOL, bindToolKeys, createToolState, type Tool, type ToolState } from './input/tool';
 import type { PointerInput } from './input/pointer';
 import type { Hud } from './ui/hud';
 
@@ -15,6 +15,33 @@ export interface ToolControlOptions {
   /** 固定シャワーの水 */
   fixedShower: { setOn(on: boolean): void };
   isStarted: () => boolean;
+  /** HUD・ポインターとの接続口。渡すと、作った ToolState をつなぐ */
+  bridge?: ToolBridge;
+}
+
+/**
+ * 道具の配線より先に作る HUD・PointerInput へ渡す接続口。createToolControl に渡すと ToolState につながる。
+ * main とテストで同じ組み立てを使うためのもの。
+ */
+export interface ToolBridge {
+  /** HUD の onTool に渡す（切り替えボタンで持ち替える） */
+  readonly onTool: (tool: Tool) => void;
+  /** PointerInput の getTool に渡す（今の道具を読む） */
+  readonly getTool: () => Tool;
+  /** ToolState につなぐ（createToolControl が呼ぶ） */
+  attach(tools: ToolState): void;
+}
+
+export function createToolBridge(): ToolBridge {
+  let tools: ToolState | null = null;
+  return {
+    onTool: (tool) => tools?.set(tool),
+    // つなぐ前（作った直後）は最初の道具
+    getTool: () => tools?.current ?? DEFAULT_TOOL,
+    attach(t) {
+      tools = t;
+    },
+  };
 }
 
 export interface ToolControl {
@@ -42,6 +69,7 @@ export function createToolControl(opts: ToolControlOptions): ToolControl {
     // 手持ちシャワーの間は固定シャワーを使えない（二重に流さない）
     if (tool === 'handShower') showerInput.releaseAll();
   });
+  opts.bridge?.attach(tools);
   hud.setTool(tools.current);
   const unbindKeys = bindToolKeys({ target, tools, isStarted });
 

@@ -6,6 +6,9 @@ export type Tool = 'sponge' | 'handShower';
 
 export const TOOLS: readonly Tool[] = ['sponge', 'handShower'];
 
+/** 最初に持っている道具 */
+export const DEFAULT_TOOL: Tool = 'sponge';
+
 export interface ToolState {
   readonly current: Tool;
   /** 持ち替える。同じ道具なら何もしない */
@@ -15,7 +18,7 @@ export interface ToolState {
 /** 道具の状態。持ち替えたときだけ onChange が呼ばれる。既定はスポンジ */
 export function createToolState(
   onChange: (tool: Tool, prev: Tool) => void,
-  initial: Tool = 'sponge',
+  initial: Tool = DEFAULT_TOOL,
 ): ToolState {
   let current = initial;
   return {

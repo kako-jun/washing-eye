@@ -9,7 +9,7 @@ import { PointerInput, type SurfaceHit } from './input/pointer';
 import { Sponge } from './input/sponge';
 import { AimMarker } from './fx/aim-marker';
 import { HandShowerAim, rinseTargets, waterLevel } from './fx/water';
-import { createToolControl } from './tool-control';
+import { createToolBridge, createToolControl } from './tool-control';
 import { Steam } from './fx/steam';
 import { Shower } from './fx/shower';
 import { SoundBoard, bindAudioResumeOnGesture, bindAudioToVisibility } from './fx/audio';
@@ -61,6 +61,9 @@ let scrubSpeed = 0;
 const tangent = new THREE.Vector3();
 const bitangent = new THREE.Vector3();
 
+// 道具の配線より先に作る HUD・ポインターは、この接続口から道具を読む・持ち替える
+const toolBridge = createToolBridge();
+
 const pointer = new PointerInput(canvas, camera, body.surfaces, look, {
   onScrub(hit: SurfaceHit, speed: number) {
     scrubSpeed = Math.max(scrubSpeed, speed);
@@ -94,12 +97,12 @@ const pointer = new PointerInput(canvas, camera, body.surfaces, look, {
   onSpray(on) {
     handShower.setOn(on);
   },
-}, () => control.tools.current);
+}, toolBridge.getTool);
 
 const hud = createHud(uiRoot, {
   showFps,
   onRecenter: () => look.recenter(),
-  onTool: (tool) => control.tools.set(tool),
+  onTool: toolBridge.onTool,
 });
 
 const setMode = (mode: ControlMode) => hud.setMode(mode);
@@ -108,13 +111,14 @@ setMode(isTouch ? 'touch' : 'mouse');
 let started = false;
 
 // 道具の持ち替え（スポンジ／手持ちシャワー、HUD とキー 1 / 2）と固定シャワー（ボタン長押し／Space）の配線
-const control = createToolControl({
+createToolControl({
   target: window,
   doc: document,
   hud,
   pointer,
   fixedShower: shower,
   isStarted: () => started,
+  bridge: toolBridge,
 });
 
 showStartScreen(
