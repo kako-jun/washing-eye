@@ -2,9 +2,22 @@ import * as THREE from 'three';
 import type { LookController } from './look';
 import type { Tool } from './tool';
 
+/** 当たった面の種類。体はこする・流す対象、鏡は水を当てて曇りを取る対象 */
+export type SurfaceKind = 'body' | 'mirror';
+
+/** 鏡として扱う面に付ける印（mesh.userData.surface） */
+export const MIRROR_SURFACE = 'mirror';
+
 export interface SurfaceHit {
   point: THREE.Vector3;
   normal: THREE.Vector3;
+  /** 当たった面の種類。省略時は体 */
+  kind?: SurfaceKind;
+}
+
+/** 体に当たったときだけ、その当たりを返す（鏡は null） */
+export function bodyHit(hit: SurfaceHit | null): SurfaceHit | null {
+  return hit && (hit.kind ?? 'body') === 'body' ? hit : null;
 }
 
 export interface PointerCallbacks {
@@ -16,7 +29,7 @@ export interface PointerCallbacks {
   onHover(hit: SurfaceHit | null, scrubbing: boolean): void;
   /**
    * 手持ちシャワーの当て先（目印の位置）。ホバー中と、押して水を出している間に呼ばれる。
-   * 体に当たらなければ null（水を出している間は、外れても水は止めない）
+   * 当て先は体と鏡。どちらにも当たらなければ null（水を出している間は、外れても水は止めない）
    */
   onAim?(hit: SurfaceHit | null, spraying: boolean): void;
   /** 手持ちシャワーの水を出す・止める */
@@ -27,9 +40,10 @@ type Mode = 'idle' | 'scrub' | 'spray' | 'look';
 
 /**
  * 画面のポインター操作。持っている道具で、体の上を押したときの動きが変わる。
- * - スポンジ: 体の上で押す → こする
- * - 手持ちシャワー: 体の上で押す → 押している間、ポインターの指す点に水を当てる（マウスはホバーでも当て先を示す）
- * - どちらでも: 体の外で押す／右・中ボタン → 視線を回す（傾きモード中は視線は傾きに任せる）
+ * - スポンジ: 体の上で押す → こする（鏡はこすれないので、鏡の上は体の外と同じ扱い）
+ * - 手持ちシャワー: 体・鏡の上で押す → 押している間、ポインターの指す点に水を当てる（マウスはホバーでも当て先を示す）
+ * - どちらでも: 当て先の外で押す／右・中ボタン → 視線を回す（傾きモード中は視線は傾きに任せる）
+ * 当たり判定の対象（surfaces）には体と鏡を渡す。鏡は userData.surface に MIRROR_SURFACE を付けて見分ける。
  */
 export class PointerInput {
   private mode: Mode = 'idle';
@@ -117,13 +131,17 @@ export class PointerInput {
     if (!h || !h.face) return null;
     this.normalMatrix.getNormalMatrix(h.object.matrixWorld);
     const normal = h.face.normal.clone().applyMatrix3(this.normalMatrix).normalize();
-    return { point: h.point.clone(), normal };
+    const kind: SurfaceKind = h.object.userData.surface === MIRROR_SURFACE ? 'mirror' : 'body';
+    return { point: h.point.clone(), normal, kind };
   }
 
   private down = (e: PointerEvent) => {
     if (this.mode !== 'idle') return;
-    const hit = e.button === 0 ? this.hitAt(e.clientX, e.clientY) : null;
-    if (hit && this.getTool() === 'handShower') {
+    const target = e.button === 0 ? this.hitAt(e.clientX, e.clientY) : null;
+    const hand = this.getTool() === 'handShower';
+    // スポンジでこすれるのは体だけ。手持ちシャワーは体にも鏡にも当てられる
+    const hit = hand ? target : bodyHit(target);
+    if (hit && hand) {
       this.mode = 'spray';
       this.cb.onAim?.(hit, true);
       this.cb.onSpray?.(true);
@@ -172,7 +190,7 @@ export class PointerInput {
       return;
     }
     if (this.mode !== 'scrub') return;
-    const hit = this.hitAt(this.lastX, this.lastY);
+    const hit = bodyHit(this.hitAt(this.lastX, this.lastY));
     this.cb.onHover(hit, true);
     if (!hit) {
       this.lastHit = null;
@@ -221,7 +239,8 @@ export class PointerInput {
 
   /** 待機中のマウスの位置に、今の道具の目印を出す */
   private hover(x: number, y: number): void {
-    const hit = this.hitAt(x, y);
+    const target = this.hitAt(x, y);
+    const hit = this.getTool() === 'handShower' ? target : bodyHit(target);
     if (this.getTool() === 'handShower') this.cb.onAim?.(hit, false);
     else this.cb.onHover(hit, false);
     this.el.classList.toggle('is-over-body', !!hit);

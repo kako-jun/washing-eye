@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import { VIEW_ONLY_LAYER } from '../scene/layers';
+
+/** 水筋の色。明るい壁の前でも見えるよう、少し深い水色 */
+export const WATER_STREAK_COLOR = 0x8ec7e0;
 
 /**
  * シャワーの水。シャワーヘッドから狙った点へ向かう細い水筋（線分）と、当たった所のしぶき。
@@ -37,7 +41,7 @@ export class Shower {
     this.lineGeo = new THREE.BufferGeometry();
     this.lineGeo.setAttribute('position', new THREE.BufferAttribute(this.lines, 3));
     this.lineMat = new THREE.LineBasicMaterial({
-      color: 0xbfe6f5,
+      color: WATER_STREAK_COLOR,
       transparent: true,
       opacity: 0,
       depthWrite: false,
@@ -53,7 +57,7 @@ export class Shower {
     const sg = new THREE.BufferGeometry();
     sg.setAttribute('position', new THREE.BufferAttribute(this.splashPos, 3));
     this.splashMat = new THREE.PointsMaterial({
-      color: 0xe6f7ff,
+      color: 0xcfeefa,
       size: 0.012,
       transparent: true,
       opacity: 0,
@@ -61,6 +65,8 @@ export class Shower {
     });
     this.splash = new THREE.Points(sg, this.splashMat);
     this.splash.frustumCulled = false;
+    // しぶきの粒の大きさは画面の高さ基準なので、小さな描画先の鏡の反射には描かない
+    this.splash.layers.set(VIEW_ONLY_LAYER);
     this.group.add(this.splash);
 
     for (let i = 0; i < count; i++) this.spawn(i, Math.random());

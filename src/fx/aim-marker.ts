@@ -1,11 +1,16 @@
 import * as THREE from 'three';
 import type { SurfaceHit } from '../input/pointer';
 
+/**
+ * 目印の色。明るい鏡面・壁・肌の上でも紛れないよう、水筋（WATER_STREAK_COLOR）と同じ水色の系統で、それより濃くする
+ */
+export const AIM_MARKER_COLOR = 0x2f86ad;
+
 /** 輪の面の向き（RingGeometry は XY 平面で +Z を向く） */
 const FACING = new THREE.Vector3(0, 0, 1);
 
 /**
- * 手持ちシャワーの当て先の目印。体表に沿った細い輪で、ホバー中は控えめに、水を出している間は明るく示す。
+ * 手持ちシャワーの当て先の目印。体表・鏡面に沿った細い輪で、ホバー中は控えめに、水を出している間は濃く（不透明に）示す。
  */
 export class AimMarker {
   readonly mesh: THREE.Mesh;
@@ -19,7 +24,7 @@ export class AimMarker {
 
   constructor() {
     this.material = new THREE.MeshBasicMaterial({
-      color: 0xc6ecf7,
+      color: AIM_MARKER_COLOR,
       transparent: true,
       opacity: 0,
       depthWrite: false,

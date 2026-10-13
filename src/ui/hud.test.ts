@@ -218,6 +218,7 @@ describe('HUD 道具の切り替え', () => {
     h.setMode('mouse');
     h.setTool('handShower');
     expect(ddOf('流す')).toContain('押している間だけ水が出る');
+    expect(ddOf('流す')).toContain('鏡'); // 鏡も当て先になることを案内する
     expect(ddOf('固定シャワー')).toContain('使えない');
     expect(ddOf('洗う')).toContain('スポンジに持ち替える');
     h.setMode('touch');
