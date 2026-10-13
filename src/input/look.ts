@@ -16,6 +16,11 @@ const YAW_FADE_END = THREE.MathUtils.degToRad(88);
 const YAW_FOLLOW_RATE = 40;
 /** 通知の間隔として扱う上限（秒）。間が空いたときに一気に追いつきすぎないように */
 const MAX_TILT_DT = 0.25;
+/**
+ * 正面を確定してよい重みの下限。約 79° より浅く見下ろしていれば確定する。
+ * 足元を見たまま始めても視線が止まらず、真下付近（〜88°）の不安定なヨーは基準にしない。
+ */
+const ORIGIN_MIN_WEIGHT = 0.5;
 /** 前の通知が無いときに仮定する間隔（秒） */
 const DEFAULT_TILT_DT = 1 / 60;
 
@@ -31,7 +36,7 @@ export class LookController {
   private targetYaw = this.yaw;
   private targetPitch = this.pitch;
   private tiltActive = false;
-  /** 傾きのヨーの基準（正面）。null の間は、真下付近を向いていない通知が来たときに確定する */
+  /** 傾きのヨーの基準（正面）。null の間は、真下付近（約 79° より深い）を向いていない通知が来たときに確定する */
   private yawOrigin: number | null = null;
   private lastTiltStamp: number | null = null;
   private readonly euler = new THREE.Euler();
@@ -118,8 +123,8 @@ export class LookController {
 
     // 深く見下ろしているほどヨーの更新を弱める（真下付近の振れを視線に出さない）
     const weight = 1 - THREE.MathUtils.smoothstep(-this.euler.x, YAW_FADE_START, YAW_FADE_END);
-    // 正面の確定（開始時・正面に戻す）は、真下付近の不安定なヨーを基準にしないよう、減衰が外れるまで待つ
-    if (this.yawOrigin === null && weight >= 1) this.yawOrigin = this.euler.y;
+    // 正面の確定（開始時・正面に戻す）は、真下付近の不安定なヨーを基準にしないよう、ある程度浅くなるまで待つ
+    if (this.yawOrigin === null && weight >= ORIGIN_MIN_WEIGHT) this.yawOrigin = this.euler.y;
     if (this.yawOrigin !== null) {
       const yaw = wrapAngle(this.euler.y - this.yawOrigin);
       this.targetYaw = clampYaw(this.targetYaw + yawFollow(weight, dt) * wrapAngle(yaw - this.targetYaw));

@@ -398,6 +398,24 @@ describe('LookController 傾き入力 真下付近のヨー', () => {
     expect(targets(look).yaw).toBeCloseTo(deg(30), 6);
   });
 
+  for (const down of [75, 78]) {
+    it(`足元（${down}°）を見下ろしたまま始めても正面が決まり、端末を回すと視線が動く`, async () => {
+      const look = await tiltLook();
+      const beta = 90 - down; // 横の傾きが無ければ、見下ろし角 = 90° - beta
+      tilt(0, beta, 0, 0);
+      expect(targets(look).pitch).toBeCloseTo(deg(-down), 6);
+      expect((look as any).yawOrigin).not.toBeNull();
+      for (let i = 1; i <= 30; i++) tilt(30, beta, 0, i * 16);
+      expect(targets(look).yaw).toBeGreaterThan(deg(5));
+    });
+  }
+
+  it('真下付近（88° 側）を見下ろしたまま始めると正面は決まらない', async () => {
+    const look = await tiltLook();
+    tilt(0, 3, 0, 0);
+    expect((look as any).yawOrigin).toBeNull();
+  });
+
   it('真下付近で「正面に戻す」を押しても、不安定なヨーを正面にせず、真下から外れたときの向きを正面にする', async () => {
     const look = await tiltLook();
     tilt(0, 90, 0, 0);
