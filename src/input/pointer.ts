@@ -42,8 +42,10 @@ export class PointerInput {
   ) {
     el.addEventListener('pointerdown', this.down);
     el.addEventListener('pointermove', this.move);
-    el.addEventListener('pointerup', this.up);
-    el.addEventListener('pointercancel', this.up);
+    el.addEventListener('pointerup', this.end);
+    el.addEventListener('pointercancel', this.end);
+    // up/cancel が届かずにキャプチャが外れた場合も、同じ後始末をして操作が固まらないようにする
+    el.addEventListener('lostpointercapture', this.end);
     el.addEventListener('pointerleave', this.leave);
     el.addEventListener('contextmenu', (e) => e.preventDefault());
   }
@@ -152,8 +154,9 @@ export class PointerInput {
     this.lastHit.copy(hit.point);
   }
 
-  private up = (e: PointerEvent) => {
-    if (e.pointerId !== this.pointerId) return;
+  /** pointerup / pointercancel / lostpointercapture の共通の後始末（同じポインターで 2 回目以降は何もしない） */
+  private end = (e: PointerEvent) => {
+    if (this.mode === 'idle' || e.pointerId !== this.pointerId) return;
     if (this.mode === 'scrub') this.cb.onScrubEnd();
     this.mode = 'idle';
     this.pointerId = -1;
