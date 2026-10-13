@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 /**
  * シャワーの水。シャワーヘッドから狙った点へ向かう細い水筋（線分）と、当たった所のしぶき。
+ * ヘッドの位置と狙い点は外から与える（固定シャワーはヘッド固定・視線の先、手持ちシャワーはどちらも手の動きに追従）。
  */
 export class Shower {
   readonly group = new THREE.Group();
@@ -75,6 +76,11 @@ export class Shower {
   /** 水の当たる点 */
   aim(point: THREE.Vector3): void {
     this.target.copy(point);
+  }
+
+  /** シャワーヘッドの位置（手持ちシャワーで、手の動きに合わせて動かす） */
+  setHead(point: THREE.Vector3): void {
+    this.head.copy(point);
   }
 
   update(dt: number, hitNormal: THREE.Vector3 | null): void {
