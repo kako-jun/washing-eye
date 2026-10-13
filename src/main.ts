@@ -57,7 +57,7 @@ scene.add(steam.points);
 const shower = new Shower(stage.showerHead);
 scene.add(shower.group);
 
-// 手持ちシャワー: ポインターの指す点に当てる。ヘッドは当て先の手前に追従させる
+// 手持ちシャワー: ポインターの指す点に当てる。ヘッドは手の動きに追従させる（体なら当て先の手前、鏡なら手を前に伸ばした位置）
 const handShower = new Shower(stage.showerHead, 180);
 scene.add(handShower.group);
 const aimMarker = new AimMarker();
@@ -190,7 +190,8 @@ renderer.setAnimationLoop((time: number) => {
   shower.aim(aimPoint);
   shower.update(dt, aimHit?.normal ?? null);
 
-  // 手持ちシャワー: ヘッドは当て先から体の外側・手前に少し離した位置
+  // 手持ちシャワー: ヘッドは、体に当てるときは当て先から体の外側・手前に少し離した位置、
+  // 鏡に当てるときは手を前に伸ばした位置（目の前やや下）
   handShower.setHead(handAim.headFrom(camera.position, handHead));
   handShower.aim(handAim.point);
   handShower.update(dt, handAim.surface ? handAim.normal : null);

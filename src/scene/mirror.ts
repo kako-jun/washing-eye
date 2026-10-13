@@ -6,7 +6,7 @@ import { createToonMaterial } from './toon';
 import { setupReflectionLayers } from './layers';
 
 
-/** 鏡の枠の色。曇った鏡・明るい壁と見分けられるよう、一段濃い青灰色にする */
+/** 鏡の枠の色。曇った鏡・明るい壁と見分けられるよう、壁より一段暗い、くすんだ青灰色にする */
 export const MIRROR_FRAME_COLOR = 0x8aa1a9;
 /** 曇りの色。壁のタイルより少し青みのある灰色にして、曇った鏡の面を壁と見分けられるようにする */
 export const MIRROR_FOG_COLOR = 0xdbe6ea;
@@ -139,7 +139,10 @@ export class Mirror {
     if (this.fogDirty && this.sinceUpload >= FOG_UPLOAD_INTERVAL) this.upload();
   }
 
-  /** 反射の描画先・曇りのテクスチャ・ジオメトリ・マテリアルを解放する */
+  /**
+   * 反射の描画先・曇りのテクスチャ・ジオメトリ・マテリアルを解放する。
+   * シーンからは外さないので、呼び出し側が先に group をシーンから外す（解放後に描くと壊れたテクスチャを使ってしまう）
+   */
   dispose(): void {
     this.surface.dispose(); // 反射の描画先と反射のマテリアル
     this.fogTexture?.dispose();
