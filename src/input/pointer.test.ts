@@ -615,10 +615,22 @@ describe('PointerInput 手持ちシャワーを止めたときの目印', () => 
     expect(hit!.point.x).toBeCloseTo(worldX(60), 6);
   });
 
-  it('マウスで体の外で水を止めると、目印は null（消える）', () => {
+  it('マウスで体の外へ動かしてから水を止めると、目印は null（消える）', () => {
     tools.set('handShower');
     fire('pointerdown', { id: 1, x: ON, y: ON, pointerType: 'mouse' });
+    fire('pointermove', { id: 1, x: OFF, y: OFF, pointerType: 'mouse' });
     fire('pointerup', { id: 1, x: OFF, y: OFF, pointerType: 'mouse' });
     expect(cb.onAim).toHaveBeenLastCalledWith(null, false);
+  });
+
+  it('座標が 0,0 で届く lostpointercapture で止まっても、目印は最後に動かした位置で控えめな表示に戻る', () => {
+    tools.set('handShower');
+    fire('pointerdown', { id: 1, x: 40, y: ON, pointerType: 'mouse' });
+    fire('pointermove', { id: 1, x: 62, y: ON, pointerType: 'mouse' });
+    fire('lostpointercapture', { id: 1, x: 0, y: 0, pointerType: 'mouse' });
+    const [hit, spraying] = cb.onAim.mock.calls.at(-1)!;
+    expect(spraying).toBe(false);
+    expect(hit).not.toBeNull();
+    expect(hit!.point.x).toBeCloseTo(worldX(62), 6);
   });
 });

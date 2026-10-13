@@ -213,8 +213,9 @@ export class PointerInput {
       // タッチ・ペンは指が離れたら目印を消す
       this.clearHover();
     } else if (wasSpraying) {
-      // マウスはホバーが続くので、当て先の目印を「水を出していない」控えめな表示に戻す
-      this.cb.onAim?.(this.hitAt(e.clientX, e.clientY), false);
+      // マウスはホバーが続くので、当て先の目印を「水を出していない」控えめな表示に戻す。
+      // 位置は最後に動かした位置を使う（lostpointercapture などは座標が 0,0 で届くことがあるため）
+      this.cb.onAim?.(this.hitAt(this.lastX, this.lastY), false);
     }
   };
 
