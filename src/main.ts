@@ -8,7 +8,7 @@ import { LookController } from './input/look';
 import { PointerInput, type SurfaceHit } from './input/pointer';
 import { Sponge } from './input/sponge';
 import { AimMarker } from './fx/aim-marker';
-import { HandShowerAim, rinseTargets, waterLevel } from './fx/water';
+import { HandShowerAim, rinseTargets, waterLevel, waterSources } from './fx/water';
 import { createToolBridge, createToolControl } from './tool-control';
 import { Steam } from './fx/steam';
 import { Shower } from './fx/shower';
@@ -180,10 +180,10 @@ renderer.setAnimationLoop((time: number) => {
   aimMarker.update(dt);
 
   // 泡は水の落ちる点を中心に流す（固定: 視線の中心、手持ち: 当て先）。水音・湯気は強い方に合わせる
-  const water = [
-    { flow: shower.flowLevel, point: aimHit ? aimPoint : null },
-    { flow: handShower.flowLevel, point: handAim.onBody ? handAim.point : null },
-  ];
+  const water = waterSources(
+    { flow: shower.flowLevel, hitPoint: aimHit ? aimPoint : null },
+    { flow: handShower.flowLevel, aim: handAim },
+  );
   for (const r of rinseTargets(water)) foam.rinse(r.point, RINSE_RADIUS, 2.6 * r.flow, dt);
   foam.update(dt);
   const flow = waterLevel(water);

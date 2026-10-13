@@ -39,6 +39,21 @@ export interface WaterSource {
   point: THREE.Vector3 | null;
 }
 
+/**
+ * 2 つのシャワーの水の出方と落ちる点をまとめる（main とテストで同じ組み立てを使う）。
+ * - 固定シャワー: 視線の中心のレイが体に当たった点（当たらなければ null）
+ * - 手持ちシャワー: 水の落ちる点（体に当たっていなければ null）
+ */
+export function waterSources(
+  fixed: { flow: number; hitPoint: THREE.Vector3 | null },
+  hand: { flow: number; aim: Pick<HandShowerAim, 'point' | 'onBody'> },
+): WaterSource[] {
+  return [
+    { flow: fixed.flow, point: fixed.hitPoint },
+    { flow: hand.flow, point: hand.aim.onBody ? hand.aim.point : null },
+  ];
+}
+
 /** 泡を流す中心と強さ。水の落ちる点を中心に、ある程度出ている水だけ */
 export function rinseTargets(sources: WaterSource[]): { point: THREE.Vector3; flow: number }[] {
   return sources

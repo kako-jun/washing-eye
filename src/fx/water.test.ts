@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { HandShowerAim, RINSE_MIN_FLOW, rinseTargets, waterLevel } from './water';
+import { HandShowerAim, RINSE_MIN_FLOW, rinseTargets, waterLevel, waterSources } from './water';
 
 const hit = (x: number) => ({ point: new THREE.Vector3(x, 0, 0), normal: new THREE.Vector3(0, 0, 1) });
 
@@ -64,5 +64,37 @@ describe('泡を流す中心と水の量', () => {
   it('水音・湯気の水の量は強い方に合わせる（当たっていない水も数える）', () => {
     expect(waterLevel([{ flow: 0.3, point: p1 }, { flow: 0.7, point: null }])).toBe(0.7);
     expect(waterLevel([{ flow: 0, point: null }, { flow: 0, point: null }])).toBe(0);
+  });
+});
+
+describe('2 つのシャワーの水をまとめる（main と同じ組み立て）', () => {
+  it('固定シャワーは視線の中心が体に当たっていればその点、手持ちシャワーは水が体に当たっていれば落ちる点', () => {
+    const aim = new HandShowerAim();
+    aim.track(hit(0.4), true);
+    const center = new THREE.Vector3(0, 0.5, 0);
+    const water = waterSources({ flow: 0.9, hitPoint: center }, { flow: 0.5, aim });
+    expect(water).toEqual([
+      { flow: 0.9, point: center },
+      { flow: 0.5, point: aim.point },
+    ]);
+    expect(rinseTargets(water).map((r) => r.point)).toEqual([center, aim.point]);
+    expect(waterLevel(water)).toBe(0.9);
+  });
+
+  it('視線の中心が体から外れている・手持ちの水が体から外れていれば、その水では泡を流さない（水の量には数える）', () => {
+    const aim = new HandShowerAim();
+    aim.track(hit(0.4), true);
+    aim.track(null, true);
+    const water = waterSources({ flow: 0.9, hitPoint: null }, { flow: 0.95, aim });
+    expect(rinseTargets(water)).toEqual([]);
+    expect(waterLevel(water)).toBe(0.95);
+  });
+
+  it('手持ちの水を止めたあと（水が引く間）にホバーが動いても、流す点は止めた位置のまま', () => {
+    const aim = new HandShowerAim();
+    aim.track(hit(0.2), true);
+    aim.track(hit(0.7), false); // ホバー
+    const [, hand] = waterSources({ flow: 0, hitPoint: null }, { flow: 0.5, aim });
+    expect(hand.point!.x).toBeCloseTo(0.2, 9);
   });
 });
