@@ -95,12 +95,13 @@ export function createHud(
         `<button class="tools__button" type="button" data-tool="${tool}" aria-pressed="false"><span>${TOOL_LABELS[tool]}</span><kbd class="tools__key" hidden>${i + 1}</kbd></button>`,
     ).join('')}</div>
     <button class="shower" type="button" aria-pressed="false">${ICON_SHOWER}<span>固定シャワー</span></button>
-    <span class="visually-hidden" id="${SHOWER_DISABLED_ID}">${SHOWER_DISABLED_REASON}</span>
+    <span class="visually-hidden" id="${SHOWER_DISABLED_ID}" hidden>${SHOWER_DISABLED_REASON}</span>
   `;
   root.appendChild(el);
 
   const guide = el.querySelector<HTMLDListElement>('.guide')!;
   const shower = el.querySelector<HTMLButtonElement>('.shower')!;
+  const disabledReason = el.querySelector<HTMLSpanElement>(`#${SHOWER_DISABLED_ID}`)!;
   const reticle = el.querySelector<HTMLDivElement>('.reticle')!;
   const fps = el.querySelector<HTMLSpanElement>('.hud__fps')!;
   const recenter = el.querySelector<HTMLButtonElement>('[data-recenter]')!;
@@ -143,6 +144,8 @@ export function createHud(
       // 手持ちシャワーの間は固定シャワーを使えない（二重に流さない）
       shower.disabled = tool === 'handShower';
       // 押せない理由をツールチップと読み上げで伝える
+      // （理由の文は参照している間だけ読み上げの対象にし、それ以外は hidden にしておく）
+      disabledReason.hidden = !shower.disabled;
       if (shower.disabled) {
         shower.title = SHOWER_DISABLED_REASON;
         shower.setAttribute('aria-describedby', SHOWER_DISABLED_ID);

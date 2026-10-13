@@ -157,8 +157,9 @@ describe('HUD 道具の切り替え', () => {
     [...root.querySelectorAll('.guide dt')].find((dt) => dt.textContent === term)?.nextElementSibling
       ?.textContent ?? null;
 
-  it('最初はスポンジが選ばれ、固定シャワーは使える', () => {
+  it('最初はスポンジが選ばれ、固定シャワーは使える（押せない理由の文は hidden）', () => {
     hud();
+    expect(root.querySelector<HTMLElement>('.visually-hidden')!.hidden).toBe(true);
     expect(pressed('sponge')).toBe('true');
     expect(pressed('handShower')).toBe('false');
     expect(showerButton().disabled).toBe(false);
@@ -195,10 +196,13 @@ describe('HUD 道具の切り替え', () => {
     h.setTool('handShower');
     expect(showerButton().title).toContain('手持ちシャワーの間は使えません');
     const id = showerButton().getAttribute('aria-describedby')!;
-    expect(document.getElementById(id)!.textContent).toContain('手持ちシャワーの間は使えません');
+    const reason = document.getElementById(id)!;
+    expect(reason.textContent).toContain('手持ちシャワーの間は使えません');
+    expect(reason.hidden).toBe(false); // 参照している間は読み上げの対象
     h.setTool('sponge');
     expect(showerButton().hasAttribute('title')).toBe(false);
     expect(showerButton().hasAttribute('aria-describedby')).toBe(false);
+    expect(reason.hidden).toBe(true); // 参照していない間は hidden
   });
 
   it('操作方法を data-mode に出す（切り替えパネルの幅に合わせて案内の幅を変えるため）', () => {
