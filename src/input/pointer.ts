@@ -207,9 +207,15 @@ export class PointerInput {
   /** pointerup / pointercancel / lostpointercapture の共通の後始末（同じポインターで 2 回目以降は何もしない） */
   private end = (e: PointerEvent) => {
     if (e.pointerId !== this.pointerId) return;
+    const wasSpraying = this.mode === 'spray';
     this.stop();
-    // マウスはホバーが続くので目印を残す。タッチ・ペンは指が離れたら消す
-    if (e.pointerType !== 'mouse') this.clearHover();
+    if (e.pointerType !== 'mouse') {
+      // タッチ・ペンは指が離れたら目印を消す
+      this.clearHover();
+    } else if (wasSpraying) {
+      // マウスはホバーが続くので、当て先の目印を「水を出していない」控えめな表示に戻す
+      this.cb.onAim?.(this.hitAt(e.clientX, e.clientY), false);
+    }
   };
 
   /** 待機中のマウスの位置に、今の道具の目印を出す */

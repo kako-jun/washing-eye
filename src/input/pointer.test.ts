@@ -602,3 +602,23 @@ describe('PointerInput 持ち替え直後の目印', () => {
     expect(cb.onAim).not.toHaveBeenCalled();
   });
 });
+
+describe('PointerInput 手持ちシャワーを止めたときの目印', () => {
+  it('マウスで水を止めると、当て先の目印は離した位置で「水を出していない」表示に戻る', () => {
+    tools.set('handShower');
+    fire('pointerdown', { id: 1, x: 40, y: ON, pointerType: 'mouse' });
+    fire('pointermove', { id: 1, x: 60, y: ON, pointerType: 'mouse' });
+    input.update();
+    fire('pointerup', { id: 1, x: 60, y: ON, pointerType: 'mouse' });
+    const [hit, spraying] = cb.onAim.mock.calls.at(-1)!;
+    expect(spraying).toBe(false);
+    expect(hit!.point.x).toBeCloseTo(worldX(60), 6);
+  });
+
+  it('マウスで体の外で水を止めると、目印は null（消える）', () => {
+    tools.set('handShower');
+    fire('pointerdown', { id: 1, x: ON, y: ON, pointerType: 'mouse' });
+    fire('pointerup', { id: 1, x: OFF, y: OFF, pointerType: 'mouse' });
+    expect(cb.onAim).toHaveBeenLastCalledWith(null, false);
+  });
+});
