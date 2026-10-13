@@ -196,7 +196,14 @@ export function bindAudioToVisibility(
 }
 
 /**
- * 音が止まったままなら、次のユーザー操作（pointerdown / keydown）の中で再開をやり直す。
+ * 再開をやり直すユーザー操作のイベント。
+ * iOS では押した瞬間（pointerdown）より、離した瞬間（pointerup / touchend / click）の方が
+ * 音の再開を許されることがあるため、両方で試す。
+ */
+export const RESUME_GESTURE_EVENTS = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'] as const;
+
+/**
+ * 音が止まったままなら、次のユーザー操作（押す・離す・クリック・キー）の中で再開をやり直す。
  * iOS ではタブ復帰時の resume が拒否されることがあり、ユーザー操作の中でなら再開できるため。
  * 戻り値はリスナーを外す関数。
  */
@@ -206,12 +213,11 @@ export function bindAudioResumeOnGesture(
   sound: Pick<SoundBoard, 'resume' | 'needsResume'>,
 ): () => void {
   const onGesture = () => {
+    // 重ねて届いても、止まっているときだけ呼ぶので無害
     if (doc.visibilityState === 'visible' && sound.needsResume) sound.resume();
   };
-  target.addEventListener('pointerdown', onGesture, true);
-  target.addEventListener('keydown', onGesture, true);
+  for (const type of RESUME_GESTURE_EVENTS) target.addEventListener(type, onGesture, true);
   return () => {
-    target.removeEventListener('pointerdown', onGesture, true);
-    target.removeEventListener('keydown', onGesture, true);
+    for (const type of RESUME_GESTURE_EVENTS) target.removeEventListener(type, onGesture, true);
   };
 }

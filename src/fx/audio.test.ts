@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SoundBoard, bindAudioResumeOnGesture, bindAudioToVisibility } from './audio';
+import { RESUME_GESTURE_EVENTS, SoundBoard, bindAudioResumeOnGesture, bindAudioToVisibility } from './audio';
 
 /** 音のノードの代わり。connect は繋ぎ先を返して連鎖できるようにする */
 function fakeNode(): any {
@@ -183,32 +183,50 @@ describe('bindAudioResumeOnGesture', () => {
     return { target, sound, unbind };
   }
 
-  it('音が止まったままなら、次の pointerdown・keydown の中で resume をやり直す', () => {
+  /** 再開をやり直すイベント（押す・離す・タッチの終わり・クリック・キー） */
+  const GESTURES = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'];
+
+  it('やり直すイベントは押す・離す・タッチの終わり・クリック・キーの 5 種', () => {
+    expect([...RESUME_GESTURE_EVENTS]).toEqual(GESTURES);
+  });
+
+  it('音が止まったままなら、どのユーザー操作のイベントの中でも resume をやり直す', () => {
     const { target, sound } = setup(true);
-    target.dispatchEvent(new Event('pointerdown'));
+    GESTURES.forEach((type, i) => {
+      target.dispatchEvent(new Event(type));
+      expect(sound.resume).toHaveBeenCalledTimes(i + 1);
+    });
+  });
+
+  it('1 回のタップで押す・離す・クリックが重ねて届いても、再開できた後は呼ばない', () => {
+    const target = new EventTarget();
+    const sound = {
+      needsResume: true,
+      resume: vi.fn(() => {
+        sound.needsResume = false;
+      }),
+    };
+    bindAudioResumeOnGesture(target, { visibilityState: 'visible' }, sound);
+    for (const type of ['pointerdown', 'pointerup', 'touchend', 'click']) target.dispatchEvent(new Event(type));
     expect(sound.resume).toHaveBeenCalledTimes(1);
-    target.dispatchEvent(new Event('keydown'));
-    expect(sound.resume).toHaveBeenCalledTimes(2);
   });
 
   it('音が動いているときは、ユーザー操作があっても resume を呼ばない', () => {
     const { target, sound } = setup(false);
-    target.dispatchEvent(new Event('pointerdown'));
-    target.dispatchEvent(new Event('keydown'));
+    for (const type of GESTURES) target.dispatchEvent(new Event(type));
     expect(sound.resume).not.toHaveBeenCalled();
   });
 
   it('タブが隠れているときは resume を呼ばない', () => {
     const { target, sound } = setup(true, 'hidden');
-    target.dispatchEvent(new Event('pointerdown'));
+    for (const type of GESTURES) target.dispatchEvent(new Event(type));
     expect(sound.resume).not.toHaveBeenCalled();
   });
 
   it('外した後はユーザー操作に反応しない', () => {
     const { target, sound, unbind } = setup(true);
     unbind();
-    target.dispatchEvent(new Event('pointerdown'));
-    target.dispatchEvent(new Event('keydown'));
+    for (const type of GESTURES) target.dispatchEvent(new Event(type));
     expect(sound.resume).not.toHaveBeenCalled();
   });
 
