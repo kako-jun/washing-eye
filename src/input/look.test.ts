@@ -358,20 +358,36 @@ describe('LookController 傾き入力 真下付近のヨー', () => {
     expect(yaw).toBeLessThan(deg(30) - deg(1));
   });
 
-  it('減衰中の追いつき方は通知の頻度によらない（30Hz と 120Hz で 1 秒後の yaw が同じ）', async () => {
+  it('減衰中の追いつき方は通知の頻度によらない（20Hz で 1 回と 120Hz で 6 回、50ms 後の yaw が同じ）', async () => {
     const run = async (hz: number) => {
       const look = await tiltLook();
       tilt(0, 90, 0, 0);
       tilt(0, 10, 0, 0);
-      const stepMs = 1000 / hz;
-      for (let t = stepMs; t <= 1000 + 1e-9; t += stepMs) tilt(30, 10, 0, t);
+      const steps = Math.round((50 * hz) / 1000);
+      for (let i = 1; i <= steps; i++) tilt(30, 10, 0, (i * 1000) / hz);
       return targets(look).yaw;
     };
-    const slow = await run(30);
+    const slow = await run(20);
     const fast = await run(120);
-    expect(slow).toBeGreaterThan(0);
-    expect(slow).toBeLessThan(deg(30));
+    // まだ追いつききっていない途中で比べる（通知ごとに同じ割合で寄せる作りだと 6 回分の差が出る）
+    expect(slow).toBeGreaterThan(deg(1));
+    expect(slow).toBeLessThan(deg(29));
     expect(fast).toBeCloseTo(slow, 6);
+  });
+
+  it('timeStamp が 0 のまま進まない環境では、既定の間隔（60Hz 相当）で追いつく', async () => {
+    const run = async (stamp: (i: number) => number) => {
+      const look = await tiltLook();
+      tilt(0, 90, 0, stamp(0));
+      tilt(0, 10, 0, stamp(1));
+      for (let i = 2; i < 8; i++) tilt(30, 10, 0, stamp(i));
+      return targets(look).yaw;
+    };
+    const frozen = await run(() => 0);
+    const at60Hz = await run((i) => (i * 1000) / 60);
+    expect(frozen).toBeGreaterThan(0);
+    expect(frozen).toBeLessThan(deg(30));
+    expect(frozen).toBeCloseTo(at60Hz, 6);
   });
 
   it('減衰中でも、短い間隔で 1 回だけ届いた通知では少ししか寄らず、時間が経つほど寄る', async () => {

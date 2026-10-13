@@ -21,7 +21,7 @@ const MAX_TILT_DT = 0.25;
  * 足元を見たまま始めても視線が止まらず、真下付近（〜88°）の不安定なヨーは基準にしない。
  */
 const ORIGIN_MIN_WEIGHT = 0.5;
-/** 前の通知が無いときに仮定する間隔（秒） */
+/** 前の通知が無い・間隔が取れない（timeStamp が進まない）ときに仮定する間隔（秒） */
 const DEFAULT_TILT_DT = 1 / 60;
 
 /**
@@ -115,10 +115,10 @@ export class LookController {
     this.euler.setFromQuaternion(this.q, 'YXZ');
 
     const stamp = e.timeStamp;
-    const dt =
-      this.lastTiltStamp === null || !Number.isFinite(stamp)
-        ? DEFAULT_TILT_DT
-        : THREE.MathUtils.clamp((stamp - this.lastTiltStamp) / 1000, 0, MAX_TILT_DT);
+    const elapsed =
+      this.lastTiltStamp === null || !Number.isFinite(stamp) ? 0 : (stamp - this.lastTiltStamp) / 1000;
+    // timeStamp が 0 のまま進まない環境もあるので、間隔が取れないときは既定の間隔を使う
+    const dt = elapsed > 0 ? Math.min(elapsed, MAX_TILT_DT) : DEFAULT_TILT_DT;
     if (Number.isFinite(stamp)) this.lastTiltStamp = stamp;
 
     // 深く見下ろしているほどヨーの更新を弱める（真下付近の振れを視線に出さない）
