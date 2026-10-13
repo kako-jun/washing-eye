@@ -1,23 +1,56 @@
 import { ICON_RECENTER, ICON_SHOWER } from './icons';
+import { TOOLS, type Tool } from '../input/tool';
 
 export type ControlMode = 'tilt' | 'touch' | 'mouse';
 
-const GUIDES: Record<ControlMode, [string, string][]> = {
-  tilt: [
-    ['見回す', '端末を傾ける'],
-    ['洗う', '体をなぞる'],
-    ['流す', 'シャワーを長押し。視線の先に当たる'],
-  ],
-  touch: [
-    ['見回す', '体の外をなぞる'],
-    ['洗う', '体をなぞる'],
-    ['流す', 'シャワーを長押し。視線の先に当たる'],
-  ],
-  mouse: [
-    ['見回す', '体の外をドラッグ／右・中ボタンならどこでも'],
-    ['洗う', '体をドラッグ'],
-    ['流す', 'シャワーを長押し／Space。視線の先に当たる'],
-  ],
+type GuideRow = [string, string];
+
+/** 見回す操作の案内（道具によらない） */
+const LOOK: Record<ControlMode, string> = {
+  tilt: '端末を傾ける',
+  touch: '体の外をなぞる',
+  mouse: '体の外をドラッグ／右・中ボタンならどこでも',
+};
+
+/** 持ち替えの案内 */
+const SWAP: Record<ControlMode, string> = {
+  tilt: '右下の「スポンジ」「手持ちシャワー」',
+  touch: '右下の「スポンジ」「手持ちシャワー」',
+  mouse: 'キー 1 / 2、または右下のボタン',
+};
+
+/** 持っている道具ごとの操作案内。隠れた操作を作らないよう、今できることを全部出す */
+export function guideFor(mode: ControlMode, tool: Tool): GuideRow[] {
+  if (tool === 'handShower') {
+    return [
+      ['見回す', LOOK[mode]],
+      [
+        '流す',
+        mode === 'mouse'
+          ? '体の上で当て先を選び、押している間だけ水が出る'
+          : '体に触れている間、指の先に水が出る',
+      ],
+      ['洗う', 'スポンジに持ち替える'],
+      ['固定', '手持ちシャワーの間は使えない'],
+      ['持ち替え', SWAP[mode]],
+    ];
+  }
+  return [
+    ['見回す', LOOK[mode]],
+    ['洗う', mode === 'mouse' ? '体をドラッグ' : '体をなぞる'],
+    [
+      '流す',
+      mode === 'mouse'
+        ? '固定シャワーを長押し／Space。視線の先に当たる'
+        : '固定シャワーを長押し。視線の先に当たる',
+    ],
+    ['持ち替え', SWAP[mode]],
+  ];
+}
+
+const TOOL_LABELS: Record<Tool, string> = {
+  sponge: 'スポンジ',
+  handShower: '手持ちシャワー',
 };
 
 export interface Hud {
@@ -25,6 +58,8 @@ export interface Hud {
   readonly showerButton: HTMLButtonElement;
   show(): void;
   setMode(mode: ControlMode): void;
+  /** 持っている道具を表示に反映する（切り替えボタン・案内・固定シャワーの使える/使えない） */
+  setTool(tool: Tool): void;
   setShowerOn(on: boolean): void;
   setFps(fps: number): void;
 }
@@ -37,6 +72,8 @@ export function createHud(
   opts: {
     showFps: boolean;
     onRecenter(): void;
+    /** 切り替えボタンで道具が選ばれたとき */
+    onTool(tool: Tool): void;
   },
 ): Hud {
   const el = document.createElement('div');
@@ -49,7 +86,11 @@ export function createHud(
     </div>
     <div class="reticle" aria-hidden="true"></div>
     <dl class="guide" aria-label="操作案内"></dl>
-    <button class="shower" type="button" aria-pressed="false">${ICON_SHOWER}<span>シャワー</span></button>
+    <div class="tools" role="group" aria-label="手に持つ道具">${TOOLS.map(
+      (tool, i) =>
+        `<button class="tools__button" type="button" data-tool="${tool}" aria-pressed="false"><span>${TOOL_LABELS[tool]}</span><kbd class="tools__key" hidden>${i + 1}</kbd></button>`,
+    ).join('')}</div>
+    <button class="shower" type="button" aria-pressed="false">${ICON_SHOWER}<span>固定シャワー</span></button>
   `;
   root.appendChild(el);
 
@@ -59,18 +100,42 @@ export function createHud(
   const fps = el.querySelector<HTMLSpanElement>('.hud__fps')!;
   const recenter = el.querySelector<HTMLButtonElement>('[data-recenter]')!;
 
-  recenter.addEventListener('click', () => opts.onRecenter());
+  const toolButtons = [...el.querySelectorAll<HTMLButtonElement>('[data-tool]')];
+  const toolKeys = [...el.querySelectorAll<HTMLElement>('.tools__key')];
+  let mode: ControlMode = 'mouse';
+  let tool: Tool = 'sponge';
 
-  return {
+  const renderGuide = () => {
+    guide.innerHTML = guideFor(mode, tool)
+      .map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`)
+      .join('');
+  };
+
+  recenter.addEventListener('click', () => opts.onRecenter());
+  for (const b of toolButtons) {
+    // マウスで押してもフォーカスを移さない（フォーカスが残ると Space が固定シャワーに届かなくなる）
+    b.addEventListener('mousedown', (e) => e.preventDefault());
+    b.addEventListener('click', () => opts.onTool(b.dataset.tool as Tool));
+  }
+
+  const hud: Hud = {
     showerButton: shower,
     show() {
       el.classList.add('is-visible');
     },
-    setMode(mode) {
-      guide.innerHTML = GUIDES[mode]
-        .map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`)
-        .join('');
+    setMode(next) {
+      mode = next;
+      renderGuide();
       recenter.hidden = mode !== 'tilt';
+      // キーの手がかりはキーボードのある操作（マウス）のときだけ出す
+      for (const k of toolKeys) k.hidden = mode !== 'mouse';
+    },
+    setTool(next) {
+      tool = next;
+      for (const b of toolButtons) b.setAttribute('aria-pressed', String(b.dataset.tool === tool));
+      // 手持ちシャワーの間は固定シャワーを使えない（二重に流さない）
+      shower.disabled = tool === 'handShower';
+      renderGuide();
     },
     setShowerOn(on) {
       shower.classList.toggle('is-on', on);
@@ -81,4 +146,6 @@ export function createHud(
       fps.textContent = `${Math.round(v)} fps`;
     },
   };
+  hud.setTool(tool);
+  return hud;
 }

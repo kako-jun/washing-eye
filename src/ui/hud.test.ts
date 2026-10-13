@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import { createHud, type Hud } from './hud';
+import { createHud, guideFor, type Hud } from './hud';
 
 /**
  * 本番の style.css の本文。vitest は CSS を空として読み込む（`?raw` も空になる）ため、
@@ -14,10 +14,12 @@ const css: string = nodeProcess
 let root: HTMLDivElement;
 let style: HTMLStyleElement;
 let onRecenter: Mock<() => void>;
+let onTool: Mock<(tool: string) => void>;
 
 function hud(showFps = true): Hud {
   onRecenter = vi.fn();
-  return createHud(root, { showFps, onRecenter });
+  onTool = vi.fn();
+  return createHud(root, { showFps, onRecenter, onTool });
 }
 
 const q = <T extends Element>(sel: string) => root.querySelector<T>(sel)!;
@@ -127,5 +129,88 @@ describe('HUD 表示', () => {
     h.setMode('tilt');
     recenter().click();
     expect(onRecenter).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('HUD 道具の切り替え', () => {
+  const toolButton = (tool: string) => q<HTMLButtonElement>(`[data-tool="${tool}"]`);
+  const pressed = (tool: string) => toolButton(tool).getAttribute('aria-pressed');
+  const showerButton = () => q<HTMLButtonElement>('.shower');
+  const ddOf = (term: string) =>
+    [...root.querySelectorAll('.guide dt')].find((dt) => dt.textContent === term)?.nextElementSibling
+      ?.textContent ?? null;
+
+  it('最初はスポンジが選ばれ、固定シャワーは使える', () => {
+    hud();
+    expect(pressed('sponge')).toBe('true');
+    expect(pressed('handShower')).toBe('false');
+    expect(showerButton().disabled).toBe(false);
+    expect(showerButton().textContent).toContain('固定シャワー');
+  });
+
+  it('切り替えボタンを押すと、その道具で onTool が呼ばれる（表示の更新は setTool で行う）', () => {
+    hud();
+    toolButton('handShower').click();
+    expect(onTool).toHaveBeenCalledWith('handShower');
+    toolButton('sponge').click();
+    expect(onTool).toHaveBeenLastCalledWith('sponge');
+  });
+
+  it('切り替えボタンはマウスで押してもフォーカスを奪わない（Space を固定シャワーに残す）', () => {
+    hud();
+    const e = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    toolButton('handShower').dispatchEvent(e);
+    expect(e.defaultPrevented).toBe(true);
+  });
+
+  it('setTool で手持ちシャワーにすると、ボタンの選択が移り、固定シャワーは押せなくなる', () => {
+    const h = hud();
+    h.setTool('handShower');
+    expect(pressed('handShower')).toBe('true');
+    expect(pressed('sponge')).toBe('false');
+    expect(showerButton().disabled).toBe(true);
+    h.setTool('sponge');
+    expect(showerButton().disabled).toBe(false);
+  });
+
+  it('手持ちシャワーの間は、案内が流し方と「固定は使えない」に変わる', () => {
+    const h = hud();
+    h.setMode('mouse');
+    h.setTool('handShower');
+    expect(ddOf('流す')).toContain('押している間だけ水が出る');
+    expect(ddOf('固定')).toContain('使えない');
+    expect(ddOf('洗う')).toContain('スポンジに持ち替える');
+    h.setMode('touch');
+    expect(ddOf('流す')).toContain('触れている間');
+  });
+
+  it('スポンジに戻すと、案内も元に戻る（固定シャワーの Space が出る）', () => {
+    const h = hud();
+    h.setMode('mouse');
+    h.setTool('handShower');
+    h.setTool('sponge');
+    expect(ddOf('流す')).toContain('Space');
+    expect(ddOf('固定')).toBeNull();
+  });
+
+  it('キー 1 / 2 の手がかりはマウス操作のときだけ見せる', () => {
+    const h = hud();
+    h.setMode('mouse');
+    const keys = [...root.querySelectorAll<HTMLElement>('.tools__key')];
+    expect(keys.map((k) => k.textContent)).toEqual(['1', '2']);
+    expect(keys.every((k) => !k.hidden)).toBe(true);
+    expect(ddOf('持ち替え')).toContain('1 / 2');
+    h.setMode('touch');
+    expect(keys.every((k) => k.hidden)).toBe(true);
+    expect(ddOf('持ち替え')).not.toContain('1 / 2');
+  });
+
+  it('どの操作方法・道具でも、見回し・流す・持ち替えの案内が必ずある', () => {
+    for (const mode of ['tilt', 'touch', 'mouse'] as const) {
+      for (const tool of ['sponge', 'handShower'] as const) {
+        const terms = guideFor(mode, tool).map(([k]) => k);
+        expect(terms).toEqual(expect.arrayContaining(['見回す', '流す', '洗う', '持ち替え']));
+      }
+    }
   });
 });
