@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import './ui/style.css';
 import { MIRROR_PLACEMENT, createStage, watchPixelRatio } from './scene/stage';
-import { MIRROR_LAYER, Mirror } from './scene/mirror';
+import { Mirror } from './scene/mirror';
+import { MIRROR_LAYER } from './scene/layers';
 import { createMirrorHead } from './body/head';
 import { createBody } from './body/createBody';
 import { DEFAULT_BODY } from './body/params';

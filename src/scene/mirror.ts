@@ -5,7 +5,6 @@ import { CLEAR_RATE, FogMask, createUpdateThrottle, mirrorUv } from '../fx/mirro
 import { createToonMaterial } from './toon';
 import { setupReflectionLayers } from './layers';
 
-export { MIRROR_LAYER } from './layers';
 
 /** 鏡の枠の色。曇った鏡・明るい壁と見分けられるよう、一段濃い青灰色にする */
 export const MIRROR_FRAME_COLOR = 0x8aa1a9;

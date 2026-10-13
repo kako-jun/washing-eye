@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import * as THREE from 'three';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MIRROR_FOG_COLOR, MIRROR_FRAME_COLOR, MIRROR_LAYER, Mirror } from './mirror';
+import { MIRROR_FOG_COLOR, MIRROR_FRAME_COLOR, Mirror } from './mirror';
 import { WALL_COLOR } from './stage';
-import { VIEW_ONLY_LAYER, setupFirstPersonLayers } from './layers';
+import { MIRROR_LAYER, VIEW_ONLY_LAYER, setupFirstPersonLayers } from './layers';
 import { MIRROR_SURFACE } from '../input/pointer';
 import { REFOG_SECONDS } from '../fx/mirror-fog';
 import { createMirrorHead } from '../body/head';
