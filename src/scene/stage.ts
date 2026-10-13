@@ -29,6 +29,16 @@ export const MIRROR_PLACEMENT = {
   height: 0.62,
 };
 
+/**
+ * 一人称カメラ。目の位置に置き、一人称だけの効果（湯気・水しぶき）を描き、鏡だけのもの（頭）は描かない。
+ */
+export function createFirstPersonCamera(): THREE.PerspectiveCamera {
+  const camera = new THREE.PerspectiveCamera(70, 1, 0.03, 30);
+  setupFirstPersonLayers(camera);
+  camera.position.copy(EYE_POSITION);
+  return camera;
+}
+
 /** 浴室の床・壁・腰掛けと、柔らかいライト一式を組む */
 export function createStage(canvas: HTMLCanvasElement): Stage {
   const renderer = new THREE.WebGLRenderer({
@@ -42,9 +52,7 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
   scene.background = BACKGROUND;
   scene.fog = new THREE.Fog(BACKGROUND, 2.2, 7.5);
 
-  const camera = new THREE.PerspectiveCamera(70, 1, 0.03, 30);
-  setupFirstPersonLayers(camera);
-  camera.position.copy(EYE_POSITION);
+  const camera = createFirstPersonCamera();
 
   // ライト: 明るく柔らかい環境光 + 窓から差すような暖かい主光 + 暖色の補助
   scene.add(new THREE.HemisphereLight(0xf4fbff, 0xb7c7cd, 1.15));

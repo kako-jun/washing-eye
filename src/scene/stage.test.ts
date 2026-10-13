@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { watchPixelRatio } from './stage';
+import * as THREE from 'three';
+import { EYE_POSITION, createFirstPersonCamera, watchPixelRatio } from './stage';
+import { MIRROR_LAYER, VIEW_ONLY_LAYER } from './layers';
+import { Steam } from '../fx/steam';
 
 /** matchMedia の代わり。作ったメディアクエリを記録し、change を投げられるようにする */
 function fakeWindow(dpr: number) {
@@ -46,5 +49,24 @@ describe('watchPixelRatio', () => {
     stop();
     queries[0].dispatchEvent(new Event('change'));
     expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('一人称カメラ', () => {
+  it('目の位置に置かれる', () => {
+    expect(createFirstPersonCamera().position.equals(EYE_POSITION)).toBe(true);
+  });
+
+  it('一人称だけの効果（湯気・水しぶき）を描き、鏡だけのもの（頭）は描かない', () => {
+    const camera = createFirstPersonCamera();
+    expect(camera.layers.isEnabled(0)).toBe(true);
+    expect(camera.layers.isEnabled(VIEW_ONLY_LAYER)).toBe(true);
+    expect(camera.layers.isEnabled(MIRROR_LAYER)).toBe(false);
+    // 実際に湯気が見える
+    expect(new Steam(2).points.layers.test(camera.layers)).toBe(true);
+  });
+
+  it('PerspectiveCamera を返す', () => {
+    expect(createFirstPersonCamera()).toBeInstanceOf(THREE.PerspectiveCamera);
   });
 });
