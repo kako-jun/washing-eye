@@ -42,8 +42,13 @@ export class LookController {
   /**
    * 傾き入力を有効にする。iOS の許可要求はユーザー操作の中から呼ぶこと。
    * 実際に値が届いた時点で傾きモードに切り替わり、onActive が呼ばれる。
+   * 2 回以上呼んでもリスナーは 1 つだけ登録する（onActive は最後に渡したものに差し替わる）。
    */
   async enableTilt(onActive: () => void): Promise<boolean> {
+    if (this.listener) {
+      this.onTilt = onActive;
+      return true;
+    }
     if (typeof DeviceOrientationEvent === 'undefined') return false;
     const ctor = DeviceOrientationEvent as unknown as {
       requestPermission?: () => Promise<'granted' | 'denied'>;
@@ -57,6 +62,8 @@ export class LookController {
       }
     }
     this.onTilt = onActive;
+    // 許可要求を待つ間に別の呼び出しが登録を済ませていたら、そちらを使う
+    if (this.listener) return true;
     this.listener = (e) => this.handleOrientation(e);
     window.addEventListener('deviceorientation', this.listener);
     return true;
