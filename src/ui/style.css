@@ -156,6 +156,15 @@ button {
   height: 14px;
 }
 
+.start__error {
+  margin: 16px auto 0;
+  max-width: 320px;
+  font-size: 13px;
+  line-height: 1.7;
+  letter-spacing: 0.03em;
+  color: var(--warm);
+}
+
 .start__note {
   margin: 24px auto 0;
   max-width: 320px;
