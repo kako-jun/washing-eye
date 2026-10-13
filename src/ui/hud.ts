@@ -31,7 +31,7 @@ export function guideFor(mode: ControlMode, tool: Tool): GuideRow[] {
           : '体に触れている間、指の先に水が出る',
       ],
       ['洗う', 'スポンジに持ち替える'],
-      ['固定', '手持ちシャワーの間は使えない'],
+      ['固定シャワー', '手持ちシャワーの間は使えない'],
       ['持ち替え', SWAP[mode]],
     ];
   }
@@ -47,6 +47,10 @@ export function guideFor(mode: ControlMode, tool: Tool): GuideRow[] {
     ['持ち替え', SWAP[mode]],
   ];
 }
+
+/** 固定シャワーのボタンを押せない理由 */
+const SHOWER_DISABLED_REASON = '手持ちシャワーの間は使えません';
+const SHOWER_DISABLED_ID = 'shower-disabled-reason';
 
 const TOOL_LABELS: Record<Tool, string> = {
   sponge: 'スポンジ',
@@ -91,6 +95,7 @@ export function createHud(
         `<button class="tools__button" type="button" data-tool="${tool}" aria-pressed="false"><span>${TOOL_LABELS[tool]}</span><kbd class="tools__key" hidden>${i + 1}</kbd></button>`,
     ).join('')}</div>
     <button class="shower" type="button" aria-pressed="false">${ICON_SHOWER}<span>固定シャワー</span></button>
+    <span class="visually-hidden" id="${SHOWER_DISABLED_ID}">${SHOWER_DISABLED_REASON}</span>
   `;
   root.appendChild(el);
 
@@ -135,6 +140,14 @@ export function createHud(
       for (const b of toolButtons) b.setAttribute('aria-pressed', String(b.dataset.tool === tool));
       // 手持ちシャワーの間は固定シャワーを使えない（二重に流さない）
       shower.disabled = tool === 'handShower';
+      // 押せない理由をツールチップと読み上げで伝える
+      if (shower.disabled) {
+        shower.title = SHOWER_DISABLED_REASON;
+        shower.setAttribute('aria-describedby', SHOWER_DISABLED_ID);
+      } else {
+        shower.removeAttribute('title');
+        shower.removeAttribute('aria-describedby');
+      }
       renderGuide();
     },
     setShowerOn(on) {

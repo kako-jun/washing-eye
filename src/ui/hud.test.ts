@@ -173,12 +173,24 @@ describe('HUD 道具の切り替え', () => {
     expect(showerButton().disabled).toBe(false);
   });
 
-  it('手持ちシャワーの間は、案内が流し方と「固定は使えない」に変わる', () => {
+  it('固定シャワーが押せない間は、理由を title と aria-describedby で伝え、使えるようになれば外す', () => {
+    const h = hud();
+    h.setTool('handShower');
+    expect(showerButton().title).toContain('手持ちシャワーの間は使えません');
+    const id = showerButton().getAttribute('aria-describedby')!;
+    expect(document.getElementById(id)!.textContent).toContain('手持ちシャワーの間は使えません');
+    h.setTool('sponge');
+    expect(showerButton().hasAttribute('title')).toBe(false);
+    expect(showerButton().hasAttribute('aria-describedby')).toBe(false);
+  });
+
+
+  it('手持ちシャワーの間は、案内が流し方と「固定シャワーは使えない」に変わる', () => {
     const h = hud();
     h.setMode('mouse');
     h.setTool('handShower');
     expect(ddOf('流す')).toContain('押している間だけ水が出る');
-    expect(ddOf('固定')).toContain('使えない');
+    expect(ddOf('固定シャワー')).toContain('使えない');
     expect(ddOf('洗う')).toContain('スポンジに持ち替える');
     h.setMode('touch');
     expect(ddOf('流す')).toContain('触れている間');
@@ -190,7 +202,7 @@ describe('HUD 道具の切り替え', () => {
     h.setTool('handShower');
     h.setTool('sponge');
     expect(ddOf('流す')).toContain('Space');
-    expect(ddOf('固定')).toBeNull();
+    expect(ddOf('固定シャワー')).toBeNull();
   });
 
   it('キー 1 / 2 の手がかりはマウス操作のときだけ見せる', () => {
