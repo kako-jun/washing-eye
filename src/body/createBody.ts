@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { BodyParams } from './params';
+import { BODY_SCALE_MAX, BODY_SCALE_MIN, type BodyParams } from './params';
 import { createToonMaterial } from '../scene/toon';
 import { createOutlineMaterial, createOutlineMesh } from '../scene/outline';
 
@@ -57,10 +57,10 @@ export function createBody(params: BodyParams): Body {
     add(mesh);
   };
 
-  const sw = params.shoulderWidth;
-  const tg = params.torsoGirth;
-  const lg = params.limbGirth;
-  const ll = params.limbLength;
+  const sw = clampScale(params.shoulderWidth);
+  const tg = clampScale(params.torsoGirth);
+  const lg = clampScale(params.limbGirth);
+  const ll = clampScale(params.limbLength);
   const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 
   // 胴: 腰の塊 + 胴のカプセル + 首（単純な形状だけ）
@@ -111,4 +111,10 @@ export function createBody(params: BodyParams): Body {
       outline.dispose();
     },
   };
+}
+
+/** 体型の倍率を許容範囲に収める。非有限な値は既定の 1 として扱う */
+function clampScale(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return THREE.MathUtils.clamp(value, BODY_SCALE_MIN, BODY_SCALE_MAX);
 }

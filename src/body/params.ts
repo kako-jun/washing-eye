@@ -17,6 +17,10 @@ export interface BodyParams {
   limbLength: number;
 }
 
+/** 体型の倍率の許容範囲。範囲外は createBody でこの範囲に収める（0 以下で体が潰れないように） */
+export const BODY_SCALE_MIN = 0.5;
+export const BODY_SCALE_MAX = 2.0;
+
 export const DEFAULT_BODY: BodyParams = {
   skinColor: '#e9c6ad',
   outlineColor: '#8a6a5c',
