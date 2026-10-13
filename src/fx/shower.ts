@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { VIEW_ONLY_LAYER } from '../scene/layers';
 
+/** 水筋の色。明るい壁の前でも見えるよう、少し深い水色 */
+export const WATER_STREAK_COLOR = 0x8ec7e0;
+
 /**
  * シャワーの水。シャワーヘッドから狙った点へ向かう細い水筋（線分）と、当たった所のしぶき。
  * ヘッドの位置と狙い点は外から与える（固定シャワーはヘッド固定・視線の先、手持ちシャワーはどちらも手の動きに追従）。
@@ -38,7 +41,7 @@ export class Shower {
     this.lineGeo = new THREE.BufferGeometry();
     this.lineGeo.setAttribute('position', new THREE.BufferAttribute(this.lines, 3));
     this.lineMat = new THREE.LineBasicMaterial({
-      color: 0x8ec7e0, // 明るい壁の前でも水筋が見えるよう、少し深い水色
+      color: WATER_STREAK_COLOR,
       transparent: true,
       opacity: 0,
       depthWrite: false,

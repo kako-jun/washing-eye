@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { AimMarker } from './aim-marker';
+import { AIM_MARKER_COLOR, AimMarker } from './aim-marker';
+import { WATER_STREAK_COLOR } from './shower';
+import { WALL_COLOR } from '../scene/stage';
+import { MIRROR_FOG_COLOR } from '../scene/mirror';
+import { DEFAULT_BODY } from '../body/params';
 
 const hit = (x: number) => ({ point: new THREE.Vector3(x, 0, 0), normal: new THREE.Vector3(0, 0, 1) });
 const run = (m: AimMarker, seconds: number) => {
@@ -49,5 +53,30 @@ describe('当て先の目印', () => {
     m.setTarget(hit(0.2), false);
     run(m, 0.5);
     expect(m.mesh.position.x).toBeCloseTo(0.2, 3);
+  });
+});
+
+describe('目印の色', () => {
+  const lum = (c: THREE.ColorRepresentation) => {
+    const col = new THREE.Color(c);
+    return 0.2126 * col.r + 0.7152 * col.g + 0.0722 * col.b;
+  };
+
+  it('明るい壁・曇った鏡・肌の上でも紛れないよう、それらよりはっきり暗い', () => {
+    for (const bg of [WALL_COLOR, MIRROR_FOG_COLOR, DEFAULT_BODY.skinColor]) {
+      expect(lum(bg) - lum(AIM_MARKER_COLOR)).toBeGreaterThan(0.3);
+    }
+  });
+
+  it('水筋と同じ水色の系統で、水筋より濃い', () => {
+    const marker = new THREE.Color(AIM_MARKER_COLOR).getHSL({ h: 0, s: 0, l: 0 });
+    const water = new THREE.Color(WATER_STREAK_COLOR).getHSL({ h: 0, s: 0, l: 0 });
+    expect(Math.abs(marker.h - water.h)).toBeLessThan(0.05);
+    expect(lum(AIM_MARKER_COLOR)).toBeLessThan(lum(WATER_STREAK_COLOR));
+  });
+
+  it('目印のマテリアルはこの色を使う', () => {
+    const m = new AimMarker();
+    expect((m.mesh.material as THREE.MeshBasicMaterial).color.getHex()).toBe(new THREE.Color(AIM_MARKER_COLOR).getHex());
   });
 });
