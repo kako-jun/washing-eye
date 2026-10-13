@@ -65,6 +65,8 @@ describe('HUD 操作案内', () => {
     const h = hud();
     h.setMode('mouse');
     expect(guideText()).toContain('体の外をドラッグ');
+    // 右・中ボタンでの見回しも案内する（隠れた操作を作らない）
+    expect(guideText()).toContain('右・中ボタン');
     const dts = [...root.querySelectorAll('.guide dt')];
     const shower = dts.find((dt) => dt.textContent === '流す')!;
     expect(shower.nextElementSibling!.textContent).toContain('Space');

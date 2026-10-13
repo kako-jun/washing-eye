@@ -20,7 +20,7 @@ type Mode = 'idle' | 'scrub' | 'look';
 /**
  * 画面のポインター操作。
  * - 体の上で押す → スポンジでこする
- * - 体の外で押す／右ボタン → 視線を回す（傾きモード中は視線は傾きに任せる）
+ * - 体の外で押す／右・中ボタン → 視線を回す（傾きモード中は視線は傾きに任せる）
  */
 export class PointerInput {
   private mode: Mode = 'idle';
