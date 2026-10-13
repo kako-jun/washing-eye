@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import type { SurfaceHit, SurfaceKind } from '../input/pointer';
 
+/** 鏡に当てるとき、目からヘッドまでの距離（手を前に伸ばした長さ） */
+const MIRROR_REACH = 0.35;
+/** 鏡に当てるとき、ヘッドを目の高さから下げる量（手は胸の前） */
+const HAND_DROP = new THREE.Vector3(0, -0.22, 0);
+
 /** 泡を流し始める水の出方の下限 */
 export const RINSE_MIN_FLOW = 0.2;
 
@@ -15,16 +20,6 @@ export class HandShowerAim {
   /** 水が当たっている面（体・鏡）。どちらからも外れていれば null */
   surface: SurfaceKind | null = null;
 
-  /** 水が体に当たっているか（外れていれば泡は流さない） */
-  get onBody(): boolean {
-    return this.surface === 'body';
-  }
-
-  /** 水が鏡に当たっているか（当たっていれば曇りを取る） */
-  get onMirror(): boolean {
-    return this.surface === 'mirror';
-  }
-
   /** PointerInput の onAim から呼ぶ。spraying が false（ホバー）のときは水の落ちる点を動かさない */
   track(hit: SurfaceHit | null, spraying: boolean): void {
     if (!spraying) return;
@@ -35,8 +30,17 @@ export class HandShowerAim {
     }
   }
 
-  /** ヘッドの位置: 当て先から体の外側（法線方向）に 0.14、目の側に 0.1 離す */
+  /**
+   * ヘッドの位置。
+   * - 体に当てているとき: 当て先から体の外側（法線方向）に 0.14、目の側に 0.1 離す（体のすぐ近くで持つ）
+   * - 鏡に当てているとき: 手を前に伸ばした位置（目から当て先へ 0.35 進み、0.22 下げる）。
+   *   鏡の手前で宙に浮かないよう、ヘッドは体の近くに置き、水を鏡まで飛ばす
+   */
   headFrom(eye: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
+    if (this.surface === 'mirror') {
+      const toTarget = new THREE.Vector3().subVectors(this.point, eye).normalize();
+      return out.copy(eye).addScaledVector(toTarget, MIRROR_REACH).add(HAND_DROP);
+    }
     const toEye = new THREE.Vector3().subVectors(eye, this.point).normalize();
     return out.copy(this.point).addScaledVector(this.normal, 0.14).addScaledVector(toEye, 0.1);
   }

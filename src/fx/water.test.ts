@@ -9,7 +9,7 @@ describe('手持ちシャワーの水の落ちる点', () => {
     const aim = new HandShowerAim();
     aim.track(hit(0.1), true);
     expect(aim.point.x).toBeCloseTo(0.1, 9);
-    expect(aim.onBody).toBe(true);
+    expect(aim.surface).toBe('body');
     aim.track(hit(0.3), true);
     expect(aim.point.x).toBeCloseTo(0.3, 9);
   });
@@ -20,7 +20,7 @@ describe('手持ちシャワーの水の落ちる点', () => {
     aim.track(hit(0.5), false);
     aim.track(null, false);
     expect(aim.point.x).toBeCloseTo(0.1, 9);
-    expect(aim.onBody).toBe(true);
+    expect(aim.surface).toBe('body');
   });
 
   it('水を出したまま体から外れると、最後の点を保ち、体には当たっていない扱いになる', () => {
@@ -28,7 +28,7 @@ describe('手持ちシャワーの水の落ちる点', () => {
     aim.track(hit(0.2), true);
     aim.track(null, true);
     expect(aim.point.x).toBeCloseTo(0.2, 9);
-    expect(aim.onBody).toBe(false);
+    expect(aim.surface).toBeNull();
   });
 
   it('ヘッドは当て先から体の外側（法線方向）と目の側に離れた位置', () => {
@@ -109,9 +109,18 @@ describe('鏡に当たる水', () => {
   it('手持ちシャワーの水が鏡に当たると、鏡に当たっている扱いになり、体には当たっていない', () => {
     const aim = new HandShowerAim();
     aim.track(mirrorHit(0.1), true);
-    expect(aim.onMirror).toBe(true);
-    expect(aim.onBody).toBe(false);
     expect(aim.surface).toBe('mirror');
+  });
+
+  it('鏡に当てているときのヘッドは、鏡の手前で宙に浮かず、手を前に伸ばした位置（目の前やや下、体の近く）', () => {
+    const aim = new HandShowerAim();
+    aim.track(mirrorHit(0), true);
+    const eye = new THREE.Vector3(0, 0.8, -0.03);
+    const head = aim.headFrom(eye, new THREE.Vector3());
+    expect(head.distanceTo(eye)).toBeLessThan(0.5);
+    expect(head.y).toBeLessThan(eye.y);
+    expect(head.z).toBeLessThan(eye.z); // 前（鏡の側）に伸ばす
+    expect(head.distanceTo(aim.point)).toBeGreaterThan(0.5); // 鏡からは離れている
   });
 
   it('固定シャワーの視線の中心が鏡に当たれば、その点で鏡の曇りを取り、泡は流さない', () => {
