@@ -7,6 +7,7 @@ import { Foam } from './foam/foam';
 import { LookController } from './input/look';
 import { PointerInput, type SurfaceHit } from './input/pointer';
 import { Sponge } from './input/sponge';
+import { createShowerInput } from './input/shower-input';
 import { Steam } from './fx/steam';
 import { Shower } from './fx/shower';
 import { SoundBoard } from './fx/audio';
@@ -74,35 +75,27 @@ const pointer = new PointerInput(canvas, camera, body.surfaces, look, {
   },
 });
 
-let showerOn = false;
-const setShower = (on: boolean) => {
-  if (showerOn === on) return;
-  showerOn = on;
-  shower.setOn(on);
-  hud.setShowerOn(on);
-};
-
 const hud = createHud(uiRoot, {
   showFps,
-  onShower: setShower,
   onRecenter: () => look.recenter(),
 });
 
 const setMode = (mode: ControlMode) => hud.setMode(mode);
 setMode(isTouch ? 'touch' : 'mouse');
 
-window.addEventListener('keydown', (e) => {
-  if (e.code === 'Space' && !e.repeat) {
-    e.preventDefault();
-    setShower(true);
-  }
-});
-window.addEventListener('keyup', (e) => {
-  if (e.code === 'Space') setShower(false);
-});
-window.addEventListener('blur', () => setShower(false));
-
 let started = false;
+
+// シャワーはボタンの長押し／Space の、いずれかが押されている間だけ出る
+createShowerInput({
+  target: window,
+  doc: document,
+  button: hud.showerButton,
+  isStarted: () => started,
+  onChange(on) {
+    shower.setOn(on);
+    hud.setShowerOn(on);
+  },
+});
 showStartScreen(uiRoot, isTouch, async () => {
   sound.start();
   if (isTouch) {

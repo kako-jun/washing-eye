@@ -21,6 +21,8 @@ const GUIDES: Record<ControlMode, [string, string][]> = {
 };
 
 export interface Hud {
+  /** シャワーボタン（押下の扱いは input/shower-input が受け持つ） */
+  readonly showerButton: HTMLButtonElement;
   show(): void;
   setMode(mode: ControlMode): void;
   setShowerOn(on: boolean): void;
@@ -34,7 +36,6 @@ export function createHud(
   root: HTMLElement,
   opts: {
     showFps: boolean;
-    onShower(on: boolean): void;
     onRecenter(): void;
   },
 ): Hud {
@@ -58,25 +59,10 @@ export function createHud(
   const fps = el.querySelector<HTMLSpanElement>('.hud__fps')!;
   const recenter = el.querySelector<HTMLButtonElement>('[data-recenter]')!;
 
-  // シャワーは押している間だけ出る
-  let pressing = -1;
-  shower.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    pressing = e.pointerId;
-    shower.setPointerCapture(e.pointerId);
-    opts.onShower(true);
-  });
-  const release = (e: PointerEvent) => {
-    if (e.pointerId !== pressing) return;
-    pressing = -1;
-    opts.onShower(false);
-  };
-  shower.addEventListener('pointerup', release);
-  shower.addEventListener('pointercancel', release);
-  shower.addEventListener('contextmenu', (e) => e.preventDefault());
   recenter.addEventListener('click', () => opts.onRecenter());
 
   return {
+    showerButton: shower,
     show() {
       el.classList.add('is-visible');
     },

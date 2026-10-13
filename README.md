@@ -34,7 +34,7 @@ URL に `?fps` を付けると、画面右上にフレームレートを表示�
 - `src/scene/` カメラ・ライト・浴室、トゥーン材質、輪郭線
 - `src/body/` 体のパラメータ（`BodyParams`）と生成
 - `src/foam/` 泡（InstancedMesh）
-- `src/input/` 視線・スポンジ操作
+- `src/input/` 視線・スポンジ操作・シャワー入力
 - `src/fx/` 湯気・シャワー・音
 - `src/ui/` スタート画面・操作案内
 
