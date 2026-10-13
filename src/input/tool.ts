@@ -42,7 +42,7 @@ const KEY_TOOLS: Record<string, Tool> = {
 };
 
 /**
- * キー 1 / 2 で持ち替える。開始前・修飾キー付き・文字入力欄にフォーカスがあるときは何もしない。
+ * キー 1 / 2 で持ち替える。開始前・修飾キー（Ctrl・Meta・Alt・Shift）付き・文字入力欄にフォーカスがあるときは何もしない。
  * 戻り値はリスナーを外す関数。
  */
 export function bindToolKeys(opts: {
@@ -54,7 +54,7 @@ export function bindToolKeys(opts: {
     const ke = e as KeyboardEvent;
     const tool = KEY_TOOLS[ke.code];
     if (!tool || !opts.isStarted()) return;
-    if (ke.ctrlKey || ke.metaKey || ke.altKey) return;
+    if (ke.ctrlKey || ke.metaKey || ke.altKey || ke.shiftKey) return;
     if (isTextInput(ke.target)) return;
     opts.tools.set(tool);
   };

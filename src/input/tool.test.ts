@@ -65,11 +65,12 @@ describe('キー 1 / 2 での持ち替え', () => {
     expect(tools.current).toBe('handShower');
   });
 
-  it('Ctrl・Meta・Alt と一緒に押したときは持ち替えない（ブラウザのショートカットを奪わない）', () => {
+  it('Ctrl・Meta・Alt・Shift と一緒に押したときは持ち替えない（ショートカットや記号の入力を奪わない）', () => {
     const { tools } = setup();
     key('Digit2', { ctrlKey: true });
     key('Digit2', { metaKey: true });
     key('Digit2', { altKey: true });
+    key('Digit2', { shiftKey: true });
     expect(tools.current).toBe('sponge');
   });
 
