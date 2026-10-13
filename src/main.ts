@@ -8,6 +8,7 @@ import { LookController } from './input/look';
 import { PointerInput, type SurfaceHit } from './input/pointer';
 import { Sponge } from './input/sponge';
 import { AimMarker } from './fx/aim-marker';
+import { HandShowerAim, rinseTargets, waterLevel } from './fx/water';
 import { createToolControl } from './tool-control';
 import { Steam } from './fx/steam';
 import { Shower } from './fx/shower';
@@ -47,10 +48,8 @@ const handShower = new Shower(stage.showerHead, 180);
 scene.add(handShower.group);
 const aimMarker = new AimMarker();
 scene.add(aimMarker.mesh);
-/** 手持ちシャワーの当て先（体から外れている間は、最後に当たっていた点を保つ） */
-const handPoint = new THREE.Vector3();
-const handNormal = new THREE.Vector3(0, 1, 0);
-let handOnBody = false;
+/** 手持ちシャワーの水の落ちる点（水を出している間だけ当て先に追従する） */
+const handAim = new HandShowerAim();
 
 const sound = new SoundBoard();
 bindAudioToVisibility(document, sound);
@@ -90,11 +89,7 @@ const pointer = new PointerInput(canvas, camera, body.surfaces, look, {
   },
   onAim(hit, spraying) {
     aimMarker.setTarget(hit, spraying);
-    handOnBody = !!hit;
-    if (hit) {
-      handPoint.copy(hit.point);
-      handNormal.copy(hit.normal);
-    }
+    handAim.track(hit, spraying);
   },
   onSpray(on) {
     handShower.setOn(on);
@@ -152,7 +147,6 @@ const aimRay = new THREE.Raycaster();
 const aimPoint = new THREE.Vector3();
 const RINSE_RADIUS = 0.13;
 const handHead = new THREE.Vector3();
-const toCamera = new THREE.Vector3();
 
 let lastTime = -1;
 let elapsed = 0;
@@ -176,20 +170,19 @@ renderer.setAnimationLoop((time: number) => {
   shower.update(dt, aimHit?.normal ?? null);
 
   // 手持ちシャワー: ヘッドは当て先から体の外側・手前に少し離した位置
-  toCamera.subVectors(camera.position, handPoint).normalize();
-  handHead.copy(handPoint).addScaledVector(handNormal, 0.14).addScaledVector(toCamera, 0.1);
-  handShower.setHead(handHead);
-  handShower.aim(handPoint);
-  handShower.update(dt, handOnBody ? handNormal : null);
+  handShower.setHead(handAim.headFrom(camera.position, handHead));
+  handShower.aim(handAim.point);
+  handShower.update(dt, handAim.onBody ? handAim.normal : null);
   aimMarker.update(dt);
 
-  // 泡は水の落ちる点を中心に流す（固定: 視線の中心、手持ち: 当て先）
-  const fixedFlow = shower.flowLevel;
-  if (fixedFlow > 0.2 && aimHit) foam.rinse(aimPoint, RINSE_RADIUS, 2.6 * fixedFlow, dt);
-  const handFlow = handShower.flowLevel;
-  if (handFlow > 0.2 && handOnBody) foam.rinse(handPoint, RINSE_RADIUS, 2.6 * handFlow, dt);
+  // 泡は水の落ちる点を中心に流す（固定: 視線の中心、手持ち: 当て先）。水音・湯気は強い方に合わせる
+  const water = [
+    { flow: shower.flowLevel, point: aimHit ? aimPoint : null },
+    { flow: handShower.flowLevel, point: handAim.onBody ? handAim.point : null },
+  ];
+  for (const r of rinseTargets(water)) foam.rinse(r.point, RINSE_RADIUS, 2.6 * r.flow, dt);
   foam.update(dt);
-  const flow = Math.max(fixedFlow, handFlow);
+  const flow = waterLevel(water);
 
   sponge.update(dt, elapsed);
   steam.setIntensity(0.45 + flow * 0.25);
