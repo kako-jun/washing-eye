@@ -7,9 +7,8 @@ import { Foam } from './foam/foam';
 import { LookController } from './input/look';
 import { PointerInput, type SurfaceHit } from './input/pointer';
 import { Sponge } from './input/sponge';
-import { createShowerInput } from './input/shower-input';
-import { bindToolKeys, createToolState } from './input/tool';
 import { AimMarker } from './fx/aim-marker';
+import { createToolControl } from './tool-control';
 import { Steam } from './fx/steam';
 import { Shower } from './fx/shower';
 import { SoundBoard, bindAudioResumeOnGesture, bindAudioToVisibility } from './fx/audio';
@@ -100,12 +99,12 @@ const pointer = new PointerInput(canvas, camera, body.surfaces, look, {
   onSpray(on) {
     handShower.setOn(on);
   },
-}, () => tools.current);
+}, () => control.tools.current);
 
 const hud = createHud(uiRoot, {
   showFps,
   onRecenter: () => look.recenter(),
-  onTool: (tool) => tools.set(tool),
+  onTool: (tool) => control.tools.set(tool),
 });
 
 const setMode = (mode: ControlMode) => hud.setMode(mode);
@@ -113,33 +112,16 @@ setMode(isTouch ? 'touch' : 'mouse');
 
 let started = false;
 
-// 手に持つ道具（スポンジ／手持ちシャワー）。持ち替えたら、もう一方の動作は止める
-const tools = createToolState((tool, prev) => {
-  pointer.toolChanged(prev); // こすり・手持ちの水流を止め、前の道具の目印を消す
-  hud.setTool(tool);
-  // 手持ちシャワーの間は固定シャワーを使えない（二重に流さない）
-  if (tool === 'handShower') showerInput.releaseAll();
-});
-bindToolKeys({ target: window, tools, isStarted: () => started });
-
-// 固定シャワーはボタンの長押し／Space の、いずれかが押されている間だけ出る（スポンジを持っている間だけ）
-const showerInput = createShowerInput({
+// 道具の持ち替え（スポンジ／手持ちシャワー、HUD とキー 1 / 2）と固定シャワー（ボタン長押し／Space）の配線
+const control = createToolControl({
   target: window,
   doc: document,
-  button: hud.showerButton,
+  hud,
+  pointer,
+  fixedShower: shower,
   isStarted: () => started,
-  isEnabled: () => tools.current === 'sponge',
-  onChange(on) {
-    shower.setOn(on);
-    hud.setShowerOn(on);
-  },
 });
 
-// フォーカスが外れた・タブが隠れたら、こする・手持ちの水流も止める（固定シャワーは shower-input が止める）
-window.addEventListener('blur', () => pointer.cancel());
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') pointer.cancel();
-});
 showStartScreen(
   uiRoot,
   isTouch,
